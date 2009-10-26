@@ -14,8 +14,11 @@
 :-dynamic dir_act/1.
 :-dynamic sta_act/1.
 :-dynamic msta_act/1.
+:-dynamic inv_act/1.
 
 :-dynamic camino_meta/1.
+:-dynamic meta_act/1.
+:-dynamic nuevos_objetos/0.
 
 :-dynamic ag_name/1.
 
@@ -28,7 +31,9 @@ pos_act([-1,-1]).
 sta_act(-1).
 msta_act(-1).
 dir_act(-1).
+inv_act([]).
 
+meta_act(-1).
 camino_meta([]).
 
 %-- AUXILIARES=================================================================
@@ -42,6 +47,35 @@ eliminar_rep([Ele|SL],LNoR):-
 	eliminar_rep(SL,SLNoR),
 	not(member(Ele,SLNoR)),
 	LNoR=[Ele|SLNoR].
+
+imp_info_act_ag:-
+	write('ATRIBUTOS =============================='),nl,
+	ag_name(AgName),
+	write('Nombre: '),write(AgName),nl,
+	pos_act(Pos),
+	write('Posición: '),write(Pos),nl,
+	dir_act(Dir),
+	write('Direccion: '),write(Dir),nl,
+	sta_act(Sta),
+	write('Stamina: '),write(Sta),nl,
+	msta_act(MSta),
+	write('Max Stamina: '),write(MSta),nl,nl,
+	
+	write('INVENTARIO ============================='),nl,
+	inv_act(Inv),
+	write('Inventario: '),write(Inv),nl,nl,
+	
+	write('GRILLA RECORRIDA ======================='),nl,
+	imp_grilla,nl,nl,
+	
+	write('OBJETOS VISTOS ========================='),nl,
+	imp_objetos,nl,nl,
+	
+	write('METAS ACTUALES ========================='),nl,
+	meta_act(Meta),
+	write('Meta: '),write(Meta),nl,
+	camino_meta(CMeta),
+	write('Camino a meta: '),write(CMeta),nl,nl.
 
 %--Determina si una cosa es un tesoro
 es_tesoro([treasure,_,_]).
@@ -83,15 +117,134 @@ no_es_si_mismo(Cosa):-
 	ag_name(NAgente),
 	NCosa\=NAgente.
 
+%--Elimina un elemento de una lista pertenezca o no a esta
+eliminar(_Ele,[],[]).
+eliminar(Ele,List,ListR):-
+	append([SL1,[Ele],SL2],List),
+	append([SL1,SL2],ListR).
+
+%--Determina si dos conjuntos de objetos tienen las mismas cosas, sin importar
+%--el turno en que fueron vistas (si la posicion)
+mismos_objetos([],[]).
+mismos_objetos([Obj1|SS1],S2):-
+	Obj1=[Pos,Cosa,_],
+	member([Pos,Cosa,_],S2),
+	eliminar([Pos,Cosa,_],S2,SS2),
+	mismos_objetos(SS1,SS2).
+
+cantidad_ele([],0).
+cantidad_ele([_Ele|SList],Cant):-
+	cantidad_ele(SList,SCant),
+	Cant is SCant+1.
+
+maxFila([],0).
+maxFila([Celda|SGrilla],MCF):-
+	maxFila(SGrilla,CF),
+	Celda=[Pos,_,_],
+	Pos=[F,_C],
+	
+	MCF is max(CF,F).
+
+maxCol([],0).
+maxCol([Celda|SGrilla],MCC):-
+	maxCol(SGrilla,CC),
+	Celda=[Pos,_,_],
+	Pos=[_F,C],
+	
+	MCC is max(CC,C).
+
+imp_porcentaje_grilla:-
+	estado_grilla(Grilla),
+	
+	maxFila(Grilla,MF),
+	maxCol(Grilla,MC),
+	
+	cantidad_ele(Grilla,CantE),
+	TamGrilla is MF*MC,
+	Porc is ((CantE/TamGrilla)*100),
+	write('Porcentaje='),write(Porc),nl,nl.
+
+fila(F):-estado_grilla(Grilla),maxFila(Grilla,NofAs),nnleq(F,NofAs).
+col(C):-estado_grilla(Grilla),maxCol(Grilla,NofCs),nnleq(C,NofCs).
+	
 %--Imprime la grilla interna de las celdas conocidas
 imp_grilla:-
+	tab(5),
+	forall(
+		col(C),
+		(
+			write(C),
+			(
+				(C<10,write('  '));
+				(C>9,write(' '))
+			)					
+		)
+	),nl,
+	forall(
+		fila(F),
+		(
+			(
+				(F<10,tab(3));
+				(F>9,tab(2))
+			),
+			write(F),tab(1),
+			forall(
+				col(C),
+				(
+					mostrarCelda(F,C)
+				)
+			),
+			nl
+		)
+	),
+	fail.
+imp_grilla.
+
+leyenda(plain,'.').
+leyenda(mountain,'^').
+leyenda(water,'~').
+leyenda(forest,'*').
+
+mostrarCelda(F,C):-
+	pos_act(Pos),
+	
+	Pos=[F,C],
+
+	write('@'),
+	tab(2).
+mostrarCelda(F,C):-
+	meta_act(Pos),
+	
+	Pos=[F,C],
+
+	write('X'),
+	tab(2).
+mostrarCelda(F,C):-
+	pos_act(Pos),
 	estado_grilla(Grilla),
-	write('Grilla interna='),write(Grilla),nl,nl.
+	
+	Pos\=[F,C],
+	
+	member([[F,C],Land,_],Grilla),
+	leyenda(Land,Char),
+	write(Char),
+	tab(2).
+mostrarCelda(F,C):-
+	pos_act(Pos),
+	estado_grilla(Grilla),
+	
+	Pos\=[F,C],
+	not(member([[F,C],_Obj,_],Grilla)),
+	write('#'),
+	tab(2).
+mostrarCelda(_,_):-
+	write('+'),
+	tab(2).
 
 %--Imprime los objetos percibidos 
 imp_objetos:-
 	estado_objetos(Objs),
-	write('Objetos internos='),write(Objs),nl,nl.
+	write('Objetos internos: '),write(Objs).
 
 %--reemplazar(Ele1,Ele2,List1,List2) reemplaza la primera ocurrencia de Ele2 en
 %--List1 por Ele1, da como resultado List2
@@ -256,9 +409,14 @@ act_estado_objetos(TurAct,Vis):-
 	write('Objetos no repetidos='),write(NObjetosNoRep),nl,
 	write('Objetos repetidos='),write(NObjetosRep),nl,
 	write('Objetos viejos='),write(NObjetosDif),nl,nl,
-	*/
 	
 	write(NObjetos),nl,nl,
+	*/
+	
+	(
+		(mismos_objetos(EIObjetos,NObjetos),retractall(nuevos_objetos));
+		(assert(nuevos_objetos),write('Encontre nuevos objetos...'),nl)
+	),
 	
 	retract(estado_objetos(EIObjetos)),
 	assert(estado_objetos(NObjetos)).
@@ -276,7 +434,7 @@ act_estado_ent(Perc):-
 
 %--Actualiza el estado interno de la informacion del agente
 act_estado_ag(Perc):-
-	Perc=[_Tur,_Vis,Att,_Inv],
+	Perc=[_Tur,_Vis,Att,Inv],
 	
 	%--Actualiza la posicion del agente
 	get_pos_attr(Att,Pos),
@@ -296,7 +454,11 @@ act_estado_ag(Perc):-
 	%--Actualiza la maxima stamina actual del agente
 	get_mstamina_attr(Att,MSta),
 	retract(msta_act(_)),
-	assert(msta_act(MSta)).
+	assert(msta_act(MSta)),
+	
+	%--Actualiza el inventario actual del agente
+	retract(inv_act(_)),
+	assert(inv_act(Inv)).
 
 %-- SELECCION DE ACCION========================================================
 
@@ -418,7 +580,7 @@ walkabout2_accion(Action):-
 	
 	estado_grilla(Grilla),
 	member(Celda,Grilla),
-	(Celda=[Pos,Land,0];Celda=[Pos,Land,1]),
+	Celda=[Pos,Land,_],
 	
 	Land\=forest,Land\=water,
 	
@@ -426,15 +588,23 @@ walkabout2_accion(Action):-
 	CeldaAdy=[PosAdy,_,_],
 	not(member(CeldaAdy,Grilla)),
 	
+	write('Creo que hay terreno por explorar cerca de '),write(Pos),nl,
+	write('Voy a ver si puedo llegar hasta allí'),nl,
+	
 	empezar(PosAg,Pos,SolR),
 	reverse(SolR,Sol),
+	
+	write('Si puedo llegar, ya me pongo en marcha'),nl,
+	
+	retract(meta_act(_)),
+	assert(meta_act(Pos)),
 
 	retract(camino_meta(_)),
 	assert(camino_meta(Sol)),
 	
 	seguir_camino(Action).
 walkabout2_accion(Action):-
-	write('Pero siguio por el WALK1'),nl,nl,
+	write('No, no se donde ir, voy a caminar sin rumbo a ver que encuentro'),nl,
 	walkabout_accion(Action).
 	
 %-- SELECCION==================================================================	
@@ -450,6 +620,8 @@ sel_accion(Action):-
 	Obj=[Tipo,Nombre,_Desrip],
 	Tipo=agent,
 	
+	write('Vi al agente '),write(Nombre),write(', lo voy a atacar'),nl,
+	
 	Action=attack(Nombre).
 %--Si hay un tesoro en el piso lo levanta
 sel_accion(Action):-
@@ -460,6 +632,9 @@ sel_accion(Action):-
 	member(Obj,Objetos),
 	Obj=[Tipo,Nombre,_Descrip],
 	Tipo=treasure,
+	
+	write('Esta el tesoro '),write(Nombre),
+	write(' en esta posición, voy intentar levantarlo'),nl,
 	
 	Action=pickup(Nombre).
 %--Si no esta a full de stamina, se queda esperando en un hostel
@@ -473,24 +648,30 @@ sel_accion(Action):-
 	objetos_en_pos(Pos,Objetos),
 	
 	member(Obj,Objetos),
-	Obj=[Tipo,_Nombre,_Descrip],
+	Obj=[Tipo,Nombre,_Descrip],
 	Tipo=hostel,
+	
+	write('No estoy a full de stamina, voy a descanzar en el hostel '),
+	write(Nombre),nl,
 	
 	Action=null_action.
 
 sel_accion(Action):-
+	write('Estaba llendo a algún lado?'),nl,
 	seguir_camino(Action),!.
 
 sel_accion(Action):-
-	write('Entro al WALK2'),nl,nl,
+	write('No, mejor voy a explorar un toque a ver que hay'),nl,
 	walkabout2_accion(Action),!.
 	
-sel_accion(null_action).
+sel_accion(null_action):-
+	write('Como que no voy a hacer nada'),nl.
 
 %-- ACTUALIZAR LAS METAS DEL AGENTE============================================
 act_metas:-
+	write('Estoy suficientemete cansado para buscar refujio? '),
 	sta_act(StaAg),
-	msta_act(MStaAg),
+	%--msta_act(MStaAg),
 	
 	estado_grilla(Grilla),
 	maxFila(Grilla,MF),
@@ -513,9 +694,20 @@ act_metas:-
 	empezar(PosAg,Pos,SolR),
 	reverse(SolR,Sol),
 	
+	nl,write('Si, estoy algo cansado y voy buscar refujio...'),nl,
+	write('Siguiendo este nuevo camino:'),write(Sol),nl,
+	
+	retract(meta_act(_)),
+	assert(meta_act(Pos)),
+	
 	retract(camino_meta(_)),
 	assert(camino_meta(Sol)).
 act_metas:-
+	write('No'),nl,
+	write('Habrá algun tesoro nuevo por conseguir? '),
+	camino_meta(VMeta),
+	(nuevos_objetos;VMeta=[]),
+	
 	pos_act(PosAg),
 	
 	estado_objetos(Objetos),
@@ -527,64 +719,55 @@ act_metas:-
 	empezar(PosAg,Pos,SolR),
 	reverse(SolR,Sol),
 	
+	nl,write('Si lo hay, voy a actualizar mis metas de riquezas...'),nl,
+	write('En base a este nuevo camino a seguir:'),write(Sol),nl,
+	
+	retract(meta_act(_)),
+	assert(meta_act(Pos)),
+	
 	retract(camino_meta(_)),
 	assert(camino_meta(Sol)).
-act_metas:-		
+act_metas:-
+	write('No'),nl,
+	write('No hay algo nuevo que buscar?, no tengo ningun camino nuevo a seguir? '),
+	camino_meta(VMeta),
+	not(nuevos_objetos),
+	
 	estado_objetos(Objetos),
 	member(Obj,Objetos),
 	Obj=[_Pos,Cosa,_Tur],
 	
-	not(es_tesoro(Cosa)).
+	not(es_tesoro(Cosa)),
+	nl,write('Y lo que hay no me convence...'),nl,
+	
+	write('No actualizo mis metas'),nl,
+	write('Continuo con el camino:'),write(VMeta),nl.
 act_metas:-
+	write('No'),nl,
+	write('No vi nada en mis viajes? '),
 	estado_objetos(Objetos),
-	Objetos=[].
+	Objetos=[],
+	nl,write('Tampoco actualizo mis metas'),nl,
+	write('Quizas seguiré el camino anterior'),nl.
+act_metas:-
+	write('No'),nl,
+	camino_meta(VMeta),
+	write('Nada nuevo a que aspirar...'),nl,
+	write('Seguiré por el camino en que venia:'),write(VMeta),nl.
 
 %-- CICLO======================================================================
-cantidad_ele([],0).
-cantidad_ele([_Ele|SList],Cant):-
-	cantidad_ele(SList,SCant),
-	Cant is SCant+1.
-
-maxFila([],0).
-maxFila([Celda|SGrilla],MCF):-
-	maxFila(SGrilla,CF),
-	Celda=[Pos,_,_],
-	Pos=[F,_C],
-	
-	MCF is max(CF,F).
-
-maxCol([],0).
-maxCol([Celda|SGrilla],MCC):-
-	maxCol(SGrilla,CC),
-	Celda=[Pos,_,_],
-	Pos=[_F,C],
-	
-	MCC is max(CC,C).
-
-imp_porcentaje_grilla:-
-	estado_grilla(Grilla),
-	
-	maxFila(Grilla,MF),
-	maxCol(Grilla,MC),
-	
-	cantidad_ele(Grilla,CantE),
-	TamGrilla is MF*MC,
-	Porc is ((CantE/TamGrilla)*100),
-	write('Porcentaje='),write(Porc),nl,nl.
-
 run:-
 	get_percept(Perc),
+	
+	Perc=[TurnAct,_,_,_],
+	nl,write('Turno:'),write(TurnAct),write(' --------'),nl,
 	
 	act_estado_ent(Perc),
 	act_estado_ag(Perc),
 	
+	imp_info_act_ag,
+	
 	act_metas,!,
-	
-	ag_name(AgName),
-	display_ag(AgName,Perc),
-	imp_porcentaje_grilla,
-	
-	camino_meta(Cam),write('Camino='),write(Cam),nl,nl,
 	
 	sel_accion(Action),
     do_action(Action),

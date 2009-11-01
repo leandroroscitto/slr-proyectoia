@@ -575,27 +575,41 @@ adyacente(Pos,PosV):-
 	ady_at_cardinal(Pos,Dir,PosV).
 
 %--Caminata al azar que prioriza lugares que no visito todabia
+walkabout2_action(Action):-
+	camino_meta(Camino),
+	Camino\=[],
+	seguir_camino(Action).
 walkabout2_accion(Action):-
 	pos_act(PosAg),
+	dir_act(DirAg),
 	
 	estado_grilla(Grilla),
-	member(Celda,Grilla),
-	Celda=[Pos,Land,_],
+
+	findall(
+		[Pos,_Dir],
+		(
+			member(Celda,Grilla),
+			Celda=[Pos,Land,_],
+
+			Land\=forest,Land\=water,
+
+			%--adyacente(Pos,PosAdy),
+			ady_at_cardinal(Pos,Dir,PosAdy),
+			CeldaAdy=[PosAdy,_,_],
+			not(member(CeldaAdy,Grilla))
+		),
+		Inexplorados
+	),
 	
-	Land\=forest,Land\=water,
-	
-	adyacente(Pos,PosAdy),
-	CeldaAdy=[PosAdy,_,_],
-	not(member(CeldaAdy,Grilla)),
-	
-	write('Creo que hay terreno por explorar cerca de '),write(Pos),nl,
+	write('Creo que hay terreno por explorar cerca de '),write(Inexplorados),nl,
 	write('Voy a ver si puedo llegar hasta allí'),nl,
 	
-	empezar(PosAg,Pos,SolR),
+	empezar([PosAg,DirAg],Inexplorados,SolR),
 	reverse(SolR,Sol),
 	
 	write('Si puedo llegar, ya me pongo en marcha'),nl,
 	
+	SolR=[Pos|_],
 	retract(meta_act(_)),
 	assert(meta_act(Pos)),
 
@@ -658,7 +672,8 @@ sel_accion(Action):-
 
 sel_accion(Action):-
 	write('Estaba llendo a algún lado?'),nl,
-	seguir_camino(Action),!.
+	seguir_camino(Action),!,
+	write('Si estaba siguiendo el camino'),nl.
 
 sel_accion(Action):-
 	write('No, mejor voy a explorar un toque a ver que hay'),nl,
@@ -669,7 +684,7 @@ sel_accion(null_action):-
 
 %-- ACTUALIZAR LAS METAS DEL AGENTE============================================
 act_metas:-
-	write('Estoy suficientemete cansado para buscar refujio? '),
+	write('Estoy suficientemente cansado para buscar refujio? '),
 	sta_act(StaAg),
 	%--msta_act(MStaAg),
 	
@@ -683,22 +698,60 @@ act_metas:-
 	LMSta is Dist34,
 	StaAg<LMSta,
 	
-	pos_act(PosAg),
-	
+	%--VER:Reemplazar por hostel mas cercano
 	estado_objetos(Objetos),
 	member(Obj,Objetos),
 	Obj=[Pos,Cosa,_Tur],
 	
 	es_hostel(Cosa),
 	
-	empezar(PosAg,Pos,SolR),
-	reverse(SolR,Sol),
+	meta_act(Pos),
+	
+	nl,write('Si lo estoy, pero ya estoy en camino a un hostel'),nl.
+act_metas:-
+	sta_act(StaAg),
+	%--msta_act(MStaAg),
+	
+	estado_grilla(Grilla),
+	maxFila(Grilla,MF),
+	maxCol(Grilla,MC),
+	Dist is MF+MC,
+	Dist34 is (Dist*3/4),
+	
+	%--LMSta is MStaAg/3+2,
+	LMSta is Dist34,
+	StaAg<LMSta,
 	
 	nl,write('Si, estoy algo cansado y voy buscar refujio...'),nl,
+	
+	pos_act(PosAg),
+	dir_act(DirAg),
+	
+	findall(
+		[Pos,_Dir],
+		(
+			estado_objetos(Objetos),
+			member(Obj,Objetos),
+			Obj=[Pos,Cosa,_Tur],
+			
+			es_hostel(Cosa)
+		),
+		Hosteles
+	),
+	
+	write('Conozco alguno?'),
+	Hosteles\=[],
+	
+	nl,write('Estos son los que encontre:'),write(Hosteles),nl,
+	
+	empezar([PosAg,DirAg],Hosteles,SolR),
+	reverse(SolR,Sol),
+	
 	write('Siguiendo este nuevo camino:'),write(Sol),nl,
 	
+	SolR=[Meta|_],
 	retract(meta_act(_)),
-	assert(meta_act(Pos)),
+	assert(meta_act(Meta)),
 	
 	retract(camino_meta(_)),
 	assert(camino_meta(Sol)).
@@ -709,21 +762,34 @@ act_metas:-
 	(nuevos_objetos;VMeta=[]),
 	
 	pos_act(PosAg),
+	dir_act(DirAg),
 	
-	estado_objetos(Objetos),
-	member(Obj,Objetos),
-	Obj=[Pos,Cosa,_Tur],
+	findall(
+		[Pos,_Dir],
+		(
+			estado_objetos(Objetos),
+			member(Obj,Objetos),
+			Obj=[Pos,Cosa,_Tur],
+			
+			es_tesoro(Cosa)
+		),
+		Tesoros
+	),
 	
-	es_tesoro(Cosa),
+	nl,write('Conozco alguno?'),
+	Tesoros\=[],
 	
-	empezar(PosAg,Pos,SolR),
+	nl,write('Estos son los que encontre:'),write(Tesoros),nl,
+	
+	empezar([PosAg,DirAg],Tesoros,SolR),
 	reverse(SolR,Sol),
 	
-	nl,write('Si lo hay, voy a actualizar mis metas de riquezas...'),nl,
+	write('Voy a actualizar mis metas de riquezas...'),nl,
 	write('En base a este nuevo camino a seguir:'),write(Sol),nl,
 	
+	SolR=[Meta|_],
 	retract(meta_act(_)),
-	assert(meta_act(Pos)),
+	assert(meta_act(Meta)),
 	
 	retract(camino_meta(_)),
 	assert(camino_meta(Sol)).
@@ -752,8 +818,16 @@ act_metas:-
 act_metas:-
 	write('No'),nl,
 	camino_meta(VMeta),
+	VMeta\=[],
 	write('Nada nuevo a que aspirar...'),nl,
 	write('Seguiré por el camino en que venia:'),write(VMeta),nl.
+act_metas:-
+	write('No tengo ningún camino que seguir?'),nl,
+	camino_meta(VMeta),
+	VMeta=[],
+	
+	write('No, no hay ninguna meta'),nl,
+	retract(meta_act(_)).
 
 %-- CICLO======================================================================
 run:-
@@ -775,7 +849,7 @@ run:-
 
 %-- INICIALIZACION ============================================================
 start_ag:-
-	AgName=alfa,
+	AgName=beta,
     register_me(AgName, Status),
     !,
     write('REGISTRATION STATUS: '),
@@ -787,7 +861,7 @@ start_ag:-
 s:-start_ag.
 
 start_ag_instance(InstanceID):-
-	AgClassName=alfa,
+	AgClassName=beta,
     AgInstanceName=..[AgClassName, InstanceID],
     register_me(AgInstanceName, Status),
     !,

@@ -3,10 +3,14 @@
 :-dynamic abierto/1.
 :-dynamic cerrado/1.
 
+:-dynamic esMeta/1.
+
 nodo_eti([E,_H,_C,_F],E).
 nodo_heu([_E,H,_C,_F],H).
 nodo_cam([_E,_H,C,_F],C).
-nodo_fun([_E,_H,_C,F],F).
+nodo_cos([_E,_H,_C,G],G).
+
+esMeta([[0,0],null]).
 
 mostrar_abiertos:-forall(abierto([E,_,_,_]),(write(E),write('\n'))).
 mostrar_cerrados:-forall(cerrado([E,_,_,_]),(write(E),write('\n'))).
@@ -14,8 +18,9 @@ mostrar_cerrados:-forall(cerrado([E,_,_,_]),(write(E),write('\n'))).
 resetear_abiertos:-retractall(abierto(_)).
 resetear_cerrados:-retractall(cerrado(_)).
 
-%--MODIFICACIONES
+resetear_metas:-retractall(esMeta(_)).
 
+%--MODIFICACIONES
 distancia_directa(NI,NF,Dist):-
 	NI=[FI,CI],
 	NF=[FF,CF],
@@ -29,94 +34,129 @@ distancia_directa(NI,NF,Dist):-
 	Dist is (FDist+CDist).
 
 %--Funcion heuristica
-h(Nodo,Val):-
-	esMeta(NodoM),
-	distancia_directa(Nodo,NodoM,Dist),
-	Val is Dist+1.
+h(Nodo,Dist):-
+	findall(
+		D,
+		(
+			esMeta(NodoM),
+			Nodo=[Pos,_Dir],
+			NodoM=[PosM,_DirM],
+			distancia_directa(Pos,PosM,D)
+		),
+		LDist
+	),
+	min_list(LDist,Dist).
 
 dir_posible(e).
 dir_posible(w).
 dir_posible(s).
 dir_posible(n).
 
-adyacente(Pos,PosV,P):-
+adyacente(PosDir,PosDirV,P):-
 	estado_grilla(Grilla),
 	
-	dir_posible(Dir),
-	ady_at_cardinal(Pos,Dir,PosV),
+	dir_posible(DirV),
+	PosDir=[Pos,Dir],
 	
+	ady_at_cardinal(Pos,DirV,PosV),
 	member([PosV,Land,_],Grilla),
 	Land\=water,
 	Land\=forest,
 	
-	((Land=mountain,P=2);(Land=plain,P=1)).
+	PosDirV=[PosV,DirV],
+	
+	((Land=mountain,P1=2);(Land=plain,P1=1)),
+	%--Si la dirección es distinta el costo aumenta en 1
+	((DirV=Dir,P2=0);(DirV\=Dir,P2=1)),
+	
+	P is P1+P2.
 
-:-dynamic esMeta/1.
-esMeta([0,0]).
 %--============================================================================
-
 generar_vecinos(Nodo):-
-	nodo_eti(Nodo,E),nodo_cam(Nodo,C),nodo_fun(Nodo,F),
+	nodo_eti(Nodo,E),nodo_cam(Nodo,C),nodo_cos(Nodo,G),
 	forall(
 		(
 			adyacente(E,NodoV,P),
+			E=[PosE,_],
 			not(abierto([NodoV,_,_,_])),
 			not(cerrado([NodoV,_,_,_]))
 		),
 		(
 			h(NodoV,HNV),
-			(FNV is F+P),
-			assert(abierto([NodoV,HNV,[E|C],FNV]))
+			(GNV is G+P),
+			assert(abierto([NodoV,HNV,[PosE|C],GNV]))
 		)
 	),
 	forall(
 		(
 			adyacente(E,NodoV,P),
-			abierto([NodoV,_,_,NodoVF]),
-			(FNV is F+P),
-			(FNV<NodoVF)
+			E=[PosE,_],
+			abierto([NodoV,_,_,NodoVG]),
+			(GNV is G+P),
+			(GNV<NodoVG)
 		),
 		(
-			retract(abierto([NodoV,_,_,NodoVF])),
+			retract(abierto([NodoV,_,_,NodoVG])),
 			h(NodoV,HNV),
-			assert(abierto([NodoV,HNV,[E|C],FNV]))
+			assert(abierto([NodoV,HNV,[PosE|C],GNV]))
 		)
 	),
 	forall(
 		(
 			adyacente(E,NodoV,P),
-			cerrado([NodoV,_,_,NodoVF]),
-			(FNV is F+P),
-			(FNV<NodoVF)
+			E=[PosE,_],
+			cerrado([NodoV,_,_,NodoVG]),
+			(GNV is G+P),
+			(GNV<NodoVG)
 		),
 		(
-			retract(cerrado([NodoV,_,_,NodoVF])),
+			retract(cerrado([NodoV,_,_,NodoVG])),
 			h(NodoV,HNV),
-			assert(abierto([NodoV,HNV,[E|C],FNV]))
+			assert(abierto([NodoV,HNV,[PosE|C],GNV]))
 		)
 	),
 	retract(abierto(Nodo)),assert(cerrado(Nodo)).
 
 seleccionarA(Nodo):-
 	abierto(Nodo),
-	Nodo=[_,_,_,NF],	
+	Nodo=[_,NH,_,NG],
+	NF is NH+NG,
 	forall(
-		(abierto(NodoF),NodoF=[_,_,_,NFF]),
-		(NF<NFF) | (NF=NFF)
+		(abierto(NodoF),NodoF=[_,NFH,_,NFG]),
+		(
+			NFF is NFH+NFG,
+			((NF<NFF);(NF=NFF))
+		)
 	).
 
-buscarA([NodoE|SSol]):-seleccionarA(Nodo),(Nodo=[NodoE,_,SSol,_]),esMeta(NodoE).
-buscarA(Sol):-seleccionarA(Nodo),generar_vecinos(Nodo),buscarA(Sol).
+buscarA([PosE|SSol]):-
+	seleccionarA(Nodo),
+	Nodo=[NodoE,_,SSol,_],
+	NodoE=[PosE,_],
+	%--No importa la dirección VER
+	esMeta([PosE,_]).
+buscarA(Sol):-
+	seleccionarA(Nodo),write('go'),
+	generar_vecinos(Nodo),
+	buscarA(Sol).
 
-empezar(NodoE,Meta,Sol):-
+empezar(NodoE,Metas,Sol):-
+	resetear_abiertos,
+	resetear_cerrados,
+	resetear_metas,
+	
+	NodoE=[PosE,DirE],
+	write('Estoy en '),write(PosE),write(', mirando a '),write(DirE),
+	write(', con destino a '),write(Metas),nl,
+	
+	forall(
+		member(Meta,Metas),		
+		assert(esMeta(Meta))
+	),
+	
 	h(NodoE,HN),
-	(Nodo=[NodoE,HN,[],0]),
+	Nodo=[NodoE,HN,[],0],
 	
 	assert(abierto(Nodo)),
 	
-	retractall(esMeta(_)),
-	assertz(esMeta(Meta)),
-	
-	buscarA(Sol),
-	resetear_abiertos,
-	resetear_cerrados.
+	buscarA(Sol).

@@ -12,8 +12,8 @@ nodo_cos([_E,_H,_C,G],G).
 
 esMeta([[0,0],null]).
 
-mostrar_abiertos:-write('Abiertos='),forall(abierto([E,_,_,_]),(write(E),write(','))).
-mostrar_cerrados:-write('Cerrados='),forall(cerrado([E,_,_,_]),(write(E),write(','))).
+mostrar_abiertos:-forall(abierto([E,_,_,_]),(write(E),write('\n'))).
+mostrar_cerrados:-forall(cerrado([E,_,_,_]),(write(E),write('\n'))).
 
 resetear_abiertos:-retractall(abierto(_)).
 resetear_cerrados:-retractall(cerrado(_)).
@@ -59,22 +59,12 @@ adyacente(PosDir,PosDirV,P):-
 	PosDir=[Pos,Dir],
 	
 	ady_at_cardinal(Pos,DirV,PosV),
-	(member([PosV,Land,_],Grilla);
-	(
-		not(member([PosV,_,_],Grilla)),
-		%--PosV=[FV,CV],
-		%--maxFila(Grilla,MF),
-		%--maxCol(Grilla,MC),
-		%--FV<MF,FV>1,
-		%--CV<MC,CV>1,
-		Land=unknown
-		)
-	),
+	member([PosV,Land,_],Grilla),
 	Land\=water,Land\=forest,
 	
 	PosDirV=[PosV,DirV],
 	
-	((Land=mountain,P1=2);(Land=plain,P1=1);(Land=unknown,P1=3)),
+	((Land=mountain,P1=2);(Land=plain,P1=1)),
 	%--Si la dirección es distinta el costo aumenta en 1
 	((DirV=Dir,P2=0);(DirV\=Dir,P2=1)),
 	
@@ -87,7 +77,7 @@ generar_vecinos(Nodo):-
 		(
 			adyacente(E,NodoV,P),
 			NodoV=[PosV,_],
-			%--celda_libre(PosV,G),
+			celda_libre(PosV,G),
 			
 			E=[PosE,_],
 			not(abierto([NodoV,_,_,_])),
@@ -103,7 +93,7 @@ generar_vecinos(Nodo):-
 		(
 			adyacente(E,NodoV,P),
 			NodoV=[PosV,_],
-			%--celda_libre(PosV,G),
+			celda_libre(PosV,G),
 			
 			E=[PosE,_],
 			abierto([NodoV,_,_,NodoVG]),
@@ -120,7 +110,7 @@ generar_vecinos(Nodo):-
 		(
 			adyacente(E,NodoV,P),
 			NodoV=[PosV,_],
-			%--celda_libre(PosV,G),
+			celda_libre(PosV,G),
 			
 			E=[PosE,_],
 			cerrado([NodoV,_,_,NodoVG]),
@@ -151,13 +141,11 @@ buscarA([PosE|SSol]):-
 	seleccionarA(Nodo),
 	Nodo=[NodoE,_,SSol,_],
 	NodoE=[PosE,_],
-	
 	%--No importa la dirección VER
 	esMeta([PosE,_]).
 buscarA(Sol):-
 	seleccionarA(Nodo),
 	generar_vecinos(Nodo),
-	
 	buscarA(Sol).
 
 empezar(NodoE,Metas,Sol):-

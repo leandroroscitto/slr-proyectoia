@@ -1,82 +1,84 @@
-%%-- Player-Agent Alfa
+%%-- Player-Agent Beta
 
 %-- IMPORTACION================================================================
-:-consult(ag_primitives),consult(extras_for_agents).
+%--Primitivas para interacción con el entorno
+:-consult(ag_primitives).
+%--Predicados auxiliares
+:-consult(extras_for_agents).
+%--Predicados auxiliares para impresión en pantalla
 :-consult(aux_imp).
+%--Implementación de la busqueda A*
 :-consult(busqueda).
 
 %-- PREDICADOS DINAMICOS=======================================================
+%--estado_objetos(Obs), con Obs es una lista de objetos del tipo
+%--[Posicion,Objeto,UltimoTurnoVisto], con Objeto=[Tipo,Nombre,Descripción]
+%--Representación interna de los objetos que fueron percibidos por el agente,
+%--y cual fue el último turno en el que se los vió
 :-dynamic estado_objetos/1.
+%--estado_grilla(Grilla), con Grilla una lista de celdas del tipo
+%--[Posicion,TipoTierra,Visitado]
+%--Representación interna de la geografía del entorno percibida por el agente
 :-dynamic estado_grilla/1.
 
+%--Turno actual
 :-dynamic turno_act/1.
+%--Posicion actual del agente
 :-dynamic pos_act/1.
+%--Dirección actual del agente
 :-dynamic dir_act/1.
+%--Stamina actual del agente
 :-dynamic sta_act/1.
+%--Máxima Stamina actual del agente
 :-dynamic msta_act/1.
+%--Inventario actual del agente
 :-dynamic inv_act/1.
+%--Habilidad de pelea actual del agente
+:-dynamic fs_act/1.
 
+%--camino_meta(Camino), Camino es una lista de posiciones que seguirá el agente
+%--con destino a una meta, de no presentarse alguna situación de mayor prioridad
 :-dynamic camino_meta/1.
+%--meta_act(Meta), Meta es una posición (o celda) de la grilla al que el agente
+%--intentará llegar, siempre que no se presente una situación de mayor prioridad
 :-dynamic meta_act/1.
+%--tipo_meta(Tipo), Tipo pertenece {treasure,hostel,unknown}, indica el tipo
+%--de meta que indica la posición
+:-dynamic tipo_meta/1.
+%--Representa el descubrimiento de nuevos objetos desde la última percepción
 :-dynamic nuevos_objetos/0.
+%--Representa el descubrimiento de nuevas celdas de la grilla
+:-dynamic nuevas_celdas/0.
 
+%--ag_name(Nombre), representa el Nombre del agente
 :-dynamic ag_name/1.
 
+%--ultimo_descanso(Turno), representa el último Turno en el que el agente
+%--descansó en un hostel
+:-dynamic ultimo_descanso/1.
+
 %-- HECHOS=====================================================================
+%--En un principio no existe ninguna percepción de la geografia del entorno
 estado_grilla([]).
+%--En un principio no se percibieron ningunos objetos
 estado_objetos([]).
 
+%--Inicialización nula de los atributos del agente (se actualizan luego de la
+%--primera percepción)
 turno_act(-1).
 pos_act([-1,-1]).
 sta_act(-1).
 msta_act(-1).
 dir_act(-1).
 inv_act([]).
+fs_act(-1).
 
-meta_act(-1).
+%--En un principio no existe ninguna meta ni un camino hacia alguna
+meta_act(null).
+tipo_meta(null).
 camino_meta([]).
 
 %-- AUXILIARES=================================================================
-%--TEMPORAL
-eliminar_rep([],[]).
-eliminar_rep([Ele|SL],LNoR):-
-	eliminar_rep(SL,SLNoR),
-	member(Ele,SLNoR),
-	LNoR=SLNoR.
-eliminar_rep([Ele|SL],LNoR):-
-	eliminar_rep(SL,SLNoR),
-	not(member(Ele,SLNoR)),
-	LNoR=[Ele|SLNoR].
-
-imp_info_act_ag:-
-	write('ATRIBUTOS =============================='),nl,
-	ag_name(AgName),
-	write('Nombre: '),write(AgName),nl,
-	pos_act(Pos),
-	write('Posición: '),write(Pos),nl,
-	dir_act(Dir),
-	write('Direccion: '),write(Dir),nl,
-	sta_act(Sta),
-	write('Stamina: '),write(Sta),nl,
-	msta_act(MSta),
-	write('Max Stamina: '),write(MSta),nl,nl,
-	
-	write('INVENTARIO ============================='),nl,
-	inv_act(Inv),
-	write('Inventario: '),write(Inv),nl,nl,
-	
-	write('GRILLA RECORRIDA ======================='),nl,
-	imp_grilla,nl,nl,
-	
-	write('OBJETOS VISTOS ========================='),nl,
-	imp_objetos,nl,nl,
-	
-	write('METAS ACTUALES ========================='),nl,
-	meta_act(Meta),
-	write('Meta: '),write(Meta),nl,
-	camino_meta(CMeta),
-	write('Camino a meta: '),write(CMeta),nl,nl.
-
 %--Determina si una cosa es un tesoro
 es_tesoro([treasure,_,_]).
 
@@ -89,27 +91,84 @@ es_hostel([hostel,_,_]).
 %--Determina el nombre de una cosa
 nombre_cosa([_,Nombre,_],Nombre).
 
-%--Determina la posicion actual del agente a partir de sus atributos
+%--Determina el tipo de una cosa
+tipo_cosa([Tipo,_,_],Tipo).
+
+%--Determina la descripción de una cosa
+desc_cosa([_,_,Desc],Desc).
+
+%--get_pos_attr(+Attr,-PosAct), determina la posicion actual del agente a partir
+%--de sus atributos
 get_pos_attr(Attr,PosAct):-
 	member([pos,PosAct],Attr).
 
-%--Determina la direccion actual del agente a partir de sus atributos
+%--get_dir_attr(+Attr,-DirAct), determina la direccion actual del agente a partir
+%--de sus atributos
 get_dir_attr(Attr,DirAct):-
 	member([dir,DirAct],Attr).
 
-%--Determina la stamina actual del agente a partir de sus atributos
+%--get_stamina_attr(+Attr,-StaAct), determina la stamina actual del agente a partir
+%--de sus atributos
 get_stamina_attr(Attr,StaAct):-
 	member([stamina,StaAct],Attr).
 
-%--Determina la maxima stamina actual del agente a partir de sus atributos
+%--get_mstamina_attr(+Attr,-MStaAct), determina la maxima stamina actual del agente
+%--a partir de sus atributos
 get_mstamina_attr(Attr,MStaAct):-
 	member([max_stamina,MStaAct],Attr).
 
-%--Determina la habilidad de pelea actual del agente a partir de sus atributos
+%--get_fightskill_attr(+Attr,-FSAct), determina la habilidad de pelea actual del
+%--agente a partir de sus atributos
 get_fightskill_attr(Attr,FSAct):-
 	member([fight_skill,FSAct],Attr).
+	
+%--puede_pasar_hostel(+TurnoFut), determina si es posible trasladarse a través
+%--de un hostel en un turno futuro
+puede_pasar_hostel(TurnoFut):-
+	ultimo_descanso(UTurno),!,
+	turno_act(TurnoAct),
+	
+	TurnosPasados is (TurnoAct-UTurno),
+	DifTurnos is (TurnosPasados+TurnoFut),
+	
+	%--La cantidad de turnos pasados deben ser más que la cantidad de turnos
+	%--necesarios para poder volver a pasar por un hostel
+	msta_act(MSta),
+	FET is round(MSta/2),
+	FET<DifTurnos,
+	
+	%--También la stamina en ese turno debe ser menor que la máxima stamina
+	sta_act(Sta),
+	msta_act(MSta),
+	(Sta-TurnoFut)<MSta.
+puede_pasar_hostel(_TurnoFut):-
+	%--También puede pasar por un hostel si nunca descansó en uno
+	not(ultimo_descanso(_UTurno)).
 
-%--Determina si una cosa no es un agente, y en el caso de serlo que no sea él mismo
+%--celda_libre(+Pos,+TurnoFut), determina si una celda de la grilla esta o estará
+%--libre en un turno futuro
+celda_libre(Pos,TurnoFut):-
+	estado_grilla(Grilla),
+	member([Pos,Land,_],Grilla),
+	
+	%--El terreno debe ser transitable
+	Land\=forest,
+	Land\=water,
+	
+	estado_objetos(Objetos),
+	%--Si hay un hostel en la posición, debe poder ser pasable en el turno ingresado
+	(
+		(
+			member([Pos,[hostel,_NombreH,_],_],Objetos),
+			puede_pasar_hostel(TurnoFut)
+		);
+		(
+			not(member([Pos,[hostel,_NombreH,_],_],Objetos))
+		)
+	).
+
+%--no_es_si_mismo(+Cosa), determina si una cosa no es un agente, y en el caso
+%--de serlo que no sea él mismo
 no_es_si_mismo(Cosa):-not(es_agente(Cosa)),!.
 no_es_si_mismo(Cosa):-
 	es_agente(Cosa),
@@ -117,14 +176,15 @@ no_es_si_mismo(Cosa):-
 	ag_name(NAgente),
 	NCosa\=NAgente.
 
-%--Elimina un elemento de una lista pertenezca o no a esta
+%--eliminar(+Elemento,+List,-ListR), elimina un elemento de una lista, pertenezca
+%--o no a esta
 eliminar(_Ele,[],[]).
 eliminar(Ele,List,ListR):-
 	append([SL1,[Ele],SL2],List),
 	append([SL1,SL2],ListR).
 
-%--Determina si dos conjuntos de objetos tienen las mismas cosas, sin importar
-%--el turno en que fueron vistas (si la posicion)
+%--mismos_objetos(+Conj1,+Conj2), determina si dos conjuntos de objetos tienen
+%--las mismas cosas, sin importar el turno en que fueron vistas (si la posición)
 mismos_objetos([],[]).
 mismos_objetos([Obj1|SS1],S2):-
 	Obj1=[Pos,Cosa,_],
@@ -132,11 +192,14 @@ mismos_objetos([Obj1|SS1],S2):-
 	eliminar([Pos,Cosa,_],S2,SS2),
 	mismos_objetos(SS1,SS2).
 
+%--cantidad_ele(+Lista,-Cant), determina la cantidad de elementos de una lista
 cantidad_ele([],0).
 cantidad_ele([_Ele|SList],Cant):-
 	cantidad_ele(SList,SCant),
 	Cant is SCant+1.
 
+%--maxFila(+Grilla,-Cant), máxima cantidad de filas de la grilla percibida
+%--hasta el momento
 maxFila([],0).
 maxFila([Celda|SGrilla],MCF):-
 	maxFila(SGrilla,CF),
@@ -145,6 +208,8 @@ maxFila([Celda|SGrilla],MCF):-
 	
 	MCF is max(CF,F).
 
+%--maxCol(+Grilla,-Cant), máxima cantidad de columnas de la grilla percibida
+%--hasta el momento
 maxCol([],0).
 maxCol([Celda|SGrilla],MCC):-
 	maxCol(SGrilla,CC),
@@ -153,106 +218,14 @@ maxCol([Celda|SGrilla],MCC):-
 	
 	MCC is max(CC,C).
 
-imp_porcentaje_grilla:-
-	estado_grilla(Grilla),
-	
-	maxFila(Grilla,MF),
-	maxCol(Grilla,MC),
-	
-	cantidad_ele(Grilla,CantE),
-	TamGrilla is MF*MC,
-	Porc is ((CantE/TamGrilla)*100),
-	write('Porcentaje='),write(Porc),nl,nl.
-
-fila(F):-estado_grilla(Grilla),maxFila(Grilla,NofAs),nnleq(F,NofAs).
-col(C):-estado_grilla(Grilla),maxCol(Grilla,NofCs),nnleq(C,NofCs).
-	
-%--Imprime la grilla interna de las celdas conocidas
-imp_grilla:-
-	tab(5),
-	forall(
-		col(C),
-		(
-			write(C),
-			(
-				(C<10,write('  '));
-				(C>9,write(' '))
-			)					
-		)
-	),nl,
-	forall(
-		fila(F),
-		(
-			(
-				(F<10,tab(3));
-				(F>9,tab(2))
-			),
-			write(F),tab(1),
-			forall(
-				col(C),
-				(
-					mostrarCelda(F,C)
-				)
-			),
-			nl
-		)
-	),
-	fail.
-imp_grilla.
-
-leyenda(plain,'.').
-leyenda(mountain,'^').
-leyenda(water,'~').
-leyenda(forest,'*').
-
-mostrarCelda(F,C):-
-	pos_act(Pos),
-	
-	Pos=[F,C],
-
-	write('@'),
-	tab(2).
-mostrarCelda(F,C):-
-	meta_act(Pos),
-	
-	Pos=[F,C],
-
-	write('X'),
-	tab(2).
-mostrarCelda(F,C):-
-	pos_act(Pos),
-	estado_grilla(Grilla),
-	
-	Pos\=[F,C],
-	
-	member([[F,C],Land,_],Grilla),
-	leyenda(Land,Char),
-	write(Char),
-	tab(2).
-mostrarCelda(F,C):-
-	pos_act(Pos),
-	estado_grilla(Grilla),
-	
-	Pos\=[F,C],
-	not(member([[F,C],_Obj,_],Grilla)),
-	write('#'),
-	tab(2).
-mostrarCelda(_,_):-
-	write('+'),
-	tab(2).
-
-%--Imprime los objetos percibidos 
-imp_objetos:-
-	estado_objetos(Objs),
-	write('Objetos internos: '),write(Objs).
-
-%--reemplazar(Ele1,Ele2,List1,List2) reemplaza la primera ocurrencia de Ele2 en
+%--reemplazar(+Ele1,+Ele2,+List1,-List2) reemplaza la primera ocurrencia de Ele2 en
 %--List1 por Ele1, da como resultado List2
 reemplazar(Ele1,Ele2,List1,List2):-
 	append([SList11,[Ele2],SList12],List1),
 	append([SList11,[Ele1],SList12],List2).
 
-%--Devuelve todos los objetos registrados en el estado interno dada una posicion
+%--objetos_en_pos(+Pos,-Objs), devuelve una lista de todos los objetos
+%--[Tipo,Objeto,Descr] registrados en el estado interno dada una posicion
 objetos_en_pos(Pos,Objs):-
 	estado_objetos(Objetos),
 	findall(
@@ -264,8 +237,9 @@ objetos_en_pos(Pos,Objs):-
 			Objs
 		).
 
-%--Convierte la estructura de la vision de una percepcion en una lista
-%--de objetos [Pos,Cosa,TurAct]
+%--procesar_vis(+Vis,+TurAct,-VObjetos), convierte la estructura de la vision 
+%--de una percepcion en una lista de objetos [Pos,Cosa,TurAct]
+%--Representa la lista de objetos percibidos durante el turno actual
 procesar_vis(Vis,TurAct,VObjetos):-
 	findall(
 		[Pos,Cosa,TurAct],
@@ -277,12 +251,15 @@ procesar_vis(Vis,TurAct,VObjetos):-
 		VObjetos
 	).
 
-%--Determina la accion necesaria para avanzar a la posicion destino
+%--ir_a_pos_ady(+PosDest,-Accion), determina la acción necesaria para avanzar
+%--a la posición destino a partir de la posición actual
 ir_a_pos_ady(PosDest,Accion):-
 	pos_act(PosAct),
 	dir_act(DirAct),
 	
 	ady_at_cardinal(PosAct,Dir,PosDest),
+	%--Si la dirección en la que se encuentra la posición es la misma que
+	%--la dirección actual, la acción es avanzar
 	DirAct=Dir,
 	
 	Accion=move_fwd.
@@ -291,27 +268,38 @@ ir_a_pos_ady(PosDest,Accion):-
 	dir_act(DirAct),
 	
 	ady_at_cardinal(PosAct,Dir,PosDest),
+	%--Si la dirección en la que se encuentra la posición no es la misma que
+	%--la dirección actual, la acción es girar hacia esa dirección
 	DirAct\=Dir,
 	
 	Accion=turn(Dir).
 
-%--Determina la accion para seguir un camino a una meta
+%--seguir_camino(-Accion), determina la accion para seguir un camino a una meta
 seguir_camino(_Accion):-
+	%--Si no hay camino a seguir, se retrae la meta actual y falla
 	camino_meta(Camino),
 	Camino=[],
+	retractall(meta_act(_)),
+	assert(meta_act(null)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(null)),
 	fail.
 seguir_camino(Accion):-
+	%--Si la próxima posición es igual a la posición actual del agente,
+	%--la acción necesaria es la que se determina de seguir el resto del camino
 	camino_meta(Camino),
 	Camino=[NextPos|SCamino],
 	
 	pos_act(PosAct),
 	NextPos=PosAct,
 
-	retract(camino_meta(Camino)),
+	retractall(camino_meta(Camino)),
 	assert(camino_meta(SCamino)),
 	
-	ir_a_pos_ady(NextPos,Accion).
+	seguir_camino(Accion).
 seguir_camino(Accion):-
+	%--Si la próxima posición es distinta a la posición actual del agente,
+	%--determina la acción necesaria para desplazarse a esa posición
 	camino_meta(Camino),
 	Camino=[NextPos|_SCamino],
 	
@@ -321,12 +309,14 @@ seguir_camino(Accion):-
 	ir_a_pos_ady(NextPos,Accion).
 
 %-- ACTUALIZACION DE ESTADOS===================================================
-%--Actualiza la grilla con las nuevas celdas descubiertas en la percepcion y
-%--la posicion que fue visitada
+%--act_estado_grilla(+Vis,+PosAct), actualiza la grilla interno con las nuevas
+%--celdas descubiertas en la percepcion y la posicion que fue visitada
 act_estado_grilla(Vis,PosAct):-
 	estado_grilla(Grilla),
+	%--NCeldas representa todas las celdas de la percepción (visión) actual
+	%--que no están incluidas actualmente en el estado interno del agente
 	findall(
-			%--Tercer elemento si fue o no transitado
+			%--Si ni siquiera está en el estado interno, no fue visitida todabía
 			[Pos,Land,0],
 			(
 				member(Ele,Vis),
@@ -335,32 +325,51 @@ act_estado_grilla(Vis,PosAct):-
 			),
 			NCeldas
 		),
+	%--Agrega las nuevas celdas a la grilla
 	append(Grilla,NCeldas,NGrilla),
 	
+	%--Si hay nuevas celdas representa el hecho, en otro caso también
+	(
+		(
+			NCeldas\=[],
+			assert(nuevas_celdas)
+		);
+		(
+			NCeldas=[],
+			retractall(nuevas_celdas)
+		)
+	),
+
+	%--Y reemplaza la celda de la posición actual para representar que fue
+	%--visitada
 	member([PosAct,Land,Vist],NGrilla),
 	reemplazar([PosAct,Land,1],[PosAct,Land,Vist],NGrilla,NGrillaV),
 	
-	retract(estado_grilla(Grilla)),
+	retractall(estado_grilla(Grilla)),
 	assert(estado_grilla(NGrillaV)).
 
-%--Actualiza la grilla determinando la posición que fue visitada
+%--VER: Actualizar solo los visitados una vez que toda la grilla fue descubierta
+%--act_estado_visita(+Pos), actualiza la grilla determinando la posición
+%--que fue visitada
 act_estado_visita(Pos):-
 	estado_grilla(Grilla),
 	member([Pos,Land,Vist],Grilla),
 	reemplazar([Pos,Land,1],[Pos,Land,Vist],Grilla,NGrilla),
-	retract(estado_grilla(Grilla)),
+	retractall(estado_grilla(Grilla)),
 	assert(estado_grilla(NGrilla)).
 
-%--Actualiza la representacion interna de los objetos del entorno
+%--act_estado_objetos(+TurAct,+Vis), actualiza la representación interna
+%--de los objetos del entorno, agregando o modificando los objetos a partir
+%--de la visión de la percepción actual
 act_estado_objetos(TurAct,Vis):-
-
+	%--Obtiene la lista de objetos observados en la percepción
 	procesar_vis(Vis,TurAct,VObjetos),
-	
+	%--Obtiene la representación interna de los objetos percibidos por el agente
 	estado_objetos(EIObjetos),
 	
-	%--Extrae los objetos de la vision que no se encuentran en el estado
-	%--interno, no importa la posición
-	%--Me quedo con la ultima posicion y turno conocido
+	%--Extrae los objetos de la visión que no se encuentran en el estado interno,
+	%--no importa la posición
+	%--Se queda con la ultima posicion y turno conocido del objeto
 	findall(
 		[Pos,Cosa,Tur],
 		(
@@ -371,8 +380,8 @@ act_estado_objetos(TurAct,Vis):-
 		),
 		NObjetosNoRep
 	),
-	%--Extrae los objetos de la vision que se encuentran en el estado interno
-	%--en la misma posicion y me quedo con el ultimo turno conocido
+	%--Extrae los objetos de la visión que se encuentran en el estado interno
+	%--en la misma posición y me quedo con el último turno conocido (Turno actual)
 	findall(
 		[Pos,Cosa,Tur],
 		(
@@ -383,11 +392,9 @@ act_estado_objetos(TurAct,Vis):-
 		),
 		NObjetosRep
 	),
-	%--Extrae los objetos del estado interno que no se encuentran en la
-	%--vision, y que no deberian encontrarse tampoco (no mira la pos en la
-	%--que estarian)
-	%--En caso de que la posicion es observada en la vision y los objetos
-	%--no estan no los agrega
+	%--Extrae los objetos del estado interno que no contradicen la visualización,
+	%--es decir no aparecen en la visualización y no deberían encontrarse según el
+	%--rango de visión
 	findall(
 		[Pos,Cosa,Tur],
 		(
@@ -399,65 +406,61 @@ act_estado_objetos(TurAct,Vis):-
 		),
 		NObjetosDif
 	),
-
-	append([NObjetosNoRep,NObjetosRep,NObjetosDif],NObjetos_P),
 	
-	%--PARCHE
-	eliminar_rep(NObjetos_P,NObjetos),
+	%--La nueva representación de los objetos percibidos es la unión de los
+	%--tres conjuntos construidos
+	append([NObjetosNoRep,NObjetosRep,NObjetosDif],NObjetos),
 	
-	/*
-	write('Objetos no repetidos='),write(NObjetosNoRep),nl,
-	write('Objetos repetidos='),write(NObjetosRep),nl,
-	write('Objetos viejos='),write(NObjetosDif),nl,nl,
-	
-	write(NObjetos),nl,nl,
-	*/
-	
+	%--Indica el hecho de que se modificó el conjunto de objetos percibidos
+	%--Solo considera los objetos y la posición, no el turno en que fueron
+	%--vistos
 	(
 		(mismos_objetos(EIObjetos,NObjetos),retractall(nuevos_objetos));
 		(assert(nuevos_objetos),write('Encontre nuevos objetos...'),nl)
 	),
 	
-	retract(estado_objetos(EIObjetos)),
+	retractall(estado_objetos(EIObjetos)),
 	assert(estado_objetos(NObjetos)).
 
-%--Actualiza la representacion interna del entorno
+%--act_estado_ent(+Perc), actualiza la representación interna del entorno
 act_estado_ent(Perc):-
 	Perc=[Tur,Vis,Attr,_Inv],
 	
-	retract(turno_act(_)),
+	%--Actualiza el turno actual
+	retractall(turno_act(_)),
 	assert(turno_act(Tur)),
 	
+	%--Actualiza la grilla y la representación de los objetos internas
 	get_pos_attr(Attr,PosAct),
 	act_estado_grilla(Vis,PosAct),
 	act_estado_objetos(Tur,Vis).
 
-%--Actualiza el estado interno de la informacion del agente
+%--act_estado_ag(+Perc), actualiza el estado interno de los atribtutos del agente
 act_estado_ag(Perc):-
 	Perc=[_Tur,_Vis,Att,Inv],
 	
-	%--Actualiza la posicion del agente
+	%--Actualiza la posición del agente
 	get_pos_attr(Att,Pos),
-	retract(pos_act(_)),
+	retractall(pos_act(_)),
 	assert(pos_act(Pos)),
 	
-	%--Actualiza la direccion del agente
+	%--Actualiza la dirección del agente
 	get_dir_attr(Att,Dir),
-	retract(dir_act(_)),
+	retractall(dir_act(_)),
 	assert(dir_act(Dir)),
 	
 	%--Actualiza la stamina actual del agente
 	get_stamina_attr(Att,Sta),
-	retract(sta_act(_)),
+	retractall(sta_act(_)),
 	assert(sta_act(Sta)),
 	
-	%--Actualiza la maxima stamina actual del agente
+	%--Actualiza la máxima stamina actual del agente
 	get_mstamina_attr(Att,MSta),
-	retract(msta_act(_)),
+	retractall(msta_act(_)),
 	assert(msta_act(MSta)),
 	
 	%--Actualiza el inventario actual del agente
-	retract(inv_act(_)),
+	retractall(inv_act(_)),
 	assert(inv_act(Inv)).
 
 %-- SELECCION DE ACCION========================================================
@@ -485,7 +488,9 @@ walkabout_accion(Action):-
 	%--Se fija que sea transitable
 	estado_grilla(Grilla),
 	member([PosDir,Land,Vist],Grilla),
-	Land\=forest,Land\=water,Vist=0,
+	%--Land\=forest,Land\=water,
+	celda_libre(PosDir,0),
+	Vist=0,
 	
 	%--Si es transitable avanza
 	Action=move_fwd.
@@ -501,7 +506,9 @@ walkabout_accion(Action):-
 	%--Se fija que sea transitable
 	estado_grilla(Grilla),
 	member([PosDir,Land,Vist],Grilla),
-	Land\=forest,Land\=water,Vist=0,
+	%--Land\=forest,Land\=water,
+	celda_libre(PosDir,0),
+	Vist=0,
 	
 	%--No es transitable, gira a la izquierda
 	Action=turn(DirIzq).
@@ -517,7 +524,9 @@ walkabout_accion(Action):-
 	%--Se fija que sea transitable
 	estado_grilla(Grilla),
 	member([PosDir,Land,Vist],Grilla),
-	Land\=forest,Land\=water,Vist=0,
+	%--Land\=forest,Land\=water,
+	celda_libre(PosDir,0),
+	Vist=0,
 	
 	%--No es transitable, gira a la derecha
 	Action=turn(DirDer).
@@ -532,7 +541,8 @@ walkabout_accion(Action):-
 	%--Se fija que sea transitable
 	estado_grilla(Grilla),
 	member([PosDir,Land,_Vist],Grilla),
-	Land\=forest,Land\=water,
+	%--Land\=forest,Land\=water,
+	celda_libre(PosDir,0),
 	
 	%--Si es transitable avanza
 	Action=move_fwd.
@@ -548,7 +558,8 @@ walkabout_accion(Action):-
 	%--Se fija que sea transitable
 	estado_grilla(Grilla),
 	member([PosDir,Land,_Vist],Grilla),
-	Land\=forest,Land\=water,
+	%--Land\=forest,Land\=water,
+	celda_libre(PosDir,0),
 	
 	%--No es transitable, gira a la izquierda
 	Action=turn(DirIzq).
@@ -564,29 +575,46 @@ walkabout_accion(Action):-
 	%--Se fija que sea transitable
 	estado_grilla(Grilla),
 	member([PosDir,Land,_Vist],Grilla),
-	Land\=forest,Land\=water,
+	%--Land\=forest,Land\=water,
+	celda_libre(PosDir,0),
 	
 	%--No es transitable, gira a la derecha
 	Action=turn(DirDer).
 
-%--Obtiene las celdas al rededor de la celda Pos
+%--adyacente(+Pos,-PosV), obtiene las celdas continuas de la celda Pos
 adyacente(Pos,PosV):-
 	dir_posible(Dir),
 	ady_at_cardinal(Pos,Dir,PosV).
 
-%--Caminata al azar que prioriza lugares que no visito todabia
-walkabout2_action(Action):-
-	camino_meta(Camino),
-	Camino\=[],
-	seguir_camino(Action).
-walkabout2_accion(Action):-
+%--Determina el porcentaje de la grilla descubierto (visto, no necesariamente
+%--visitado)
+porcentaje_grilla(Porc):-
+	estado_grilla(Grilla),
+	
+	maxFila(Grilla,MF),
+	maxCol(Grilla,MC),
+	
+	cantidad_ele(Grilla,CantE),
+	TamGrilla is MF*MC,
+	Porc is ((CantE/TamGrilla)*100).
+
+%--caminata(+Action), caminata al azar que prioriza lugares que no
+%--visito todabia
+caminata(Action):-
 	pos_act(PosAg),
 	dir_act(DirAg),
 	
 	estado_grilla(Grilla),
-
+	
+	write('Ya descubrí toda la grilla? '),
+	%--Si no descubrió toda la grilla, busca explorar
+	porcentaje_grilla(Porc),
+	Porc<100,
+	
+	%--Busca todos las celdas adyacentes a celdas conocidas, que no fueron
+	%--percibidas todabía
 	findall(
-		[Pos,_Dir],
+		[Pos,Dir],
 		(
 			member(Celda,Grilla),
 			Celda=[Pos,Land,_],
@@ -601,25 +629,45 @@ walkabout2_accion(Action):-
 		Inexplorados
 	),
 	
-	write('Creo que hay terreno por explorar cerca de '),write(Inexplorados),nl,
+	write('No, y creo que hay terreno por explorar cerca de '),
+	write(Inexplorados),nl,
 	write('Voy a ver si puedo llegar hasta allí'),nl,
 	
+	%--Busca el camino mas corto a una de las celdas inexploradas
 	empezar([PosAg,DirAg],Inexplorados,SolR),
 	reverse(SolR,Sol),
 	
-	write('Si puedo llegar, ya me pongo en marcha'),nl,
-	
+	%--Actualiza la meta actual
 	SolR=[Pos|_],
-	retract(meta_act(_)),
+	retractall(meta_act(_)),
 	assert(meta_act(Pos)),
-
-	retract(camino_meta(_)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(unknown)),
+	
+	%--Actualiza el camino a seguir
+	retractall(camino_meta(_)),
 	assert(camino_meta(Sol)),
 	
-	seguir_camino(Action).
-walkabout2_accion(Action):-
-	write('No, no se donde ir, voy a caminar sin rumbo a ver que encuentro'),nl,
+	%--Determina la acción necesaria para avanzar en el camino obtenido
+	seguir_camino(Action),
+	
+	write('Si puedo llegar, ya me pongo en marcha'),nl.
+caminata(Action):-
+	porcentaje_grilla(Porc),
+	(
+		(
+			%--Si ya visitó todas las celdas observables, camina al azar
+			Porc=100,
+			write('Si, no se donde ir, voy a caminar sin rumbo'),nl
+		);
+		(
+			%--Si no visitó todas las celdas observables, pero no encontro un camino
+			Porc<100,
+			write('No, no se donde ir, voy a caminar sin rumbo'),nl
+		)
+	),
 	walkabout_accion(Action).
+	
 	
 %-- SELECCION==================================================================	
 %--Si hay un agente enfrente lo ataca
@@ -668,6 +716,12 @@ sel_accion(Action):-
 	write('No estoy a full de stamina, voy a descanzar en el hostel '),
 	write(Nombre),nl,
 	
+	turno_act(Turn),
+	retractall(ultimo_descanso(_)),
+	assert(ultimo_descanso(Turn)),
+	retractall(camino_meta(_)),%--PARCHE
+	assert(camino_meta([])),%--PARCHE
+	
 	Action=null_action.
 
 sel_accion(Action):-
@@ -677,12 +731,28 @@ sel_accion(Action):-
 
 sel_accion(Action):-
 	write('No, mejor voy a explorar un toque a ver que hay'),nl,
-	walkabout2_accion(Action),!.
+	caminata(Action),!.
 	
 sel_accion(null_action):-
 	write('Como que no voy a hacer nada'),nl.
 
 %-- ACTUALIZAR LAS METAS DEL AGENTE============================================
+eliminar_inaccesibles(Tesoros,TesAcc):-
+	findall(
+		Tes,
+		(
+			member(Tes,Tesoros),
+			Tes=[Pos,_],
+			adyacente(Pos,PosA),
+			celda_libre(PosA,0),
+			adyacente(PosA,PosAA),
+			PosAA\=Pos,
+			celda_libre(PosAA,0)
+		),
+		TesR
+	),
+	list_to_set(TesR,TesAcc).
+
 act_metas:-
 	write('Estoy suficientemente cansado para buscar refujio? '),
 	sta_act(StaAg),
@@ -698,7 +768,6 @@ act_metas:-
 	LMSta is Dist34,
 	StaAg<LMSta,
 	
-	%--VER:Reemplazar por hostel mas cercano
 	estado_objetos(Objetos),
 	member(Obj,Objetos),
 	Obj=[Pos,Cosa,_Tur],
@@ -706,6 +775,9 @@ act_metas:-
 	es_hostel(Cosa),
 	
 	meta_act(Pos),
+	tipo_meta(hostel), %--VER:eliminar lo de arriba
+	
+	not(nuevas_celdas),
 	
 	nl,write('Si lo estoy, pero ya estoy en camino a un hostel'),nl.
 act_metas:-
@@ -739,59 +811,77 @@ act_metas:-
 		Hosteles
 	),
 	
-	write('Conozco alguno?'),
+	write('Conozco algún hostel?'),
 	Hosteles\=[],
 	
 	nl,write('Estos son los que encontre:'),write(Hosteles),nl,
 	
-	empezar([PosAg,DirAg],Hosteles,SolR),
+	empezar([PosAg,DirAg],Hosteles,SolR),!,
 	reverse(SolR,Sol),
 	
 	write('Siguiendo este nuevo camino:'),write(Sol),nl,
 	
 	SolR=[Meta|_],
-	retract(meta_act(_)),
+	retractall(meta_act(_)),
 	assert(meta_act(Meta)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(hostel)),
 	
-	retract(camino_meta(_)),
+	retractall(camino_meta(_)),
 	assert(camino_meta(Sol)).
 act_metas:-
 	write('No'),nl,
-	write('Habrá algun tesoro nuevo por conseguir? '),
+	write('Habrá algun tesoro nuevo, o un mejor camino por conseguir? '),
 	camino_meta(VMeta),
-	(nuevos_objetos;VMeta=[]),
+	(
+		nuevos_objetos;
+		(nuevas_celdas,tipo_meta(treasure));
+		VMeta=[];
+		(
+			%--PARCHEPARCHEPARCHEPARCHE
+			msta_act(MSta),
+			sta_act(Sta),
+			(Sta=MSta)
+		)
+	),
 	
 	pos_act(PosAg),
 	dir_act(DirAg),
 	
 	findall(
-		[Pos,_Dir],
+		[Pos,Dir],
 		(
 			estado_objetos(Objetos),
 			member(Obj,Objetos),
 			Obj=[Pos,Cosa,_Tur],
 			
+			dir_posible(Dir),%--VER
+			
 			es_tesoro(Cosa)
 		),
-		Tesoros
+		TesorosR
 	),
 	
-	nl,write('Conozco alguno?'),
+	eliminar_inaccesibles(TesorosR,Tesoros),
+	
+	nl,write('Conozco algún tesoro?'),
 	Tesoros\=[],
 	
 	nl,write('Estos son los que encontre:'),write(Tesoros),nl,
 	
-	empezar([PosAg,DirAg],Tesoros,SolR),
+	empezar([PosAg,DirAg],Tesoros,SolR),!,
 	reverse(SolR,Sol),
 	
 	write('Voy a actualizar mis metas de riquezas...'),nl,
 	write('En base a este nuevo camino a seguir:'),write(Sol),nl,
 	
 	SolR=[Meta|_],
-	retract(meta_act(_)),
+	retractall(meta_act(_)),
 	assert(meta_act(Meta)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(treasure)),
 	
-	retract(camino_meta(_)),
+	retractall(camino_meta(_)),
 	assert(camino_meta(Sol)).
 act_metas:-
 	write('No'),nl,
@@ -827,7 +917,10 @@ act_metas:-
 	VMeta=[],
 	
 	write('No, no hay ninguna meta'),nl,
-	retract(meta_act(_)).
+	retractall(meta_act(_)),
+	assert(meta_act(null)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(null)).
 
 %-- CICLO======================================================================
 run:-

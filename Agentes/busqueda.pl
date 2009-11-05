@@ -4,6 +4,7 @@
 :-dynamic cerrado/1.
 
 :-dynamic esMeta/1.
+:-dynamic cota_prof/1.
 
 nodo_eti([E,_H,_C,_F],E).
 nodo_heu([_E,H,_C,_F],H).
@@ -11,6 +12,8 @@ nodo_cam([_E,_H,C,_F],C).
 nodo_cos([_E,_H,_C,G],G).
 
 esMeta([[0,0],null]).
+
+cota_prof(-1).
 
 mostrar_abiertos:-write('Abiertos='),forall(abierto([E,_,_,_]),(write(E),write(','))).
 mostrar_cerrados:-write('Cerrados='),forall(cerrado([E,_,_,_]),(write(E),write(','))).
@@ -52,29 +55,43 @@ dir_posible(w).
 dir_posible(s).
 dir_posible(n).
 
-adyacente(PosDir,PosDirV,P):-
+dir_opuesta(e,o).
+dir_opuesta(o,e).
+dir_opuesta(s,n).
+dir_opuesta(n,s).
+
+adyacente_pos_ini(PosDir,PosDirV,P):-
 	estado_grilla(Grilla),
 	
 	dir_posible(DirV),
 	PosDir=[Pos,Dir],
 	
 	ady_at_cardinal(Pos,DirV,PosV),
-	(member([PosV,Land,_],Grilla);
-	(
-		not(member([PosV,_,_],Grilla)),
-		%--PosV=[FV,CV],
-		%--maxFila(Grilla,MF),
-		%--maxCol(Grilla,MC),
-		%--FV<MF,FV>1,
-		%--CV<MC,CV>1,
-		Land=unknown
-		)
-	),
+	member([PosV,Land,_],Grilla),
 	Land\=water,Land\=forest,
 	
 	PosDirV=[PosV,DirV],
 	
-	((Land=mountain,P1=2);(Land=plain,P1=1);(Land=unknown,P1=3)),
+	((Land=mountain,P1=2);(Land=plain,P1=1)),
+	%--Si la dirección es distinta el costo aumenta en 1
+	((DirV=Dir,P2=0);(DirV\=Dir,P2=1)),
+	
+	P is P1+P2.
+
+adyacente(PosDir,PosDirV,P):-
+	estado_grilla(Grilla),
+	
+	dir_posible(DirV),
+	PosDir=[Pos,Dir],
+	not(dir_opuesta(DirV,Dir)),
+	
+	ady_at_cardinal(Pos,DirV,PosV),
+	member([PosV,Land,_],Grilla),
+	Land\=water,Land\=forest,
+	
+	PosDirV=[PosV,DirV],
+	
+	((Land=mountain,P1=2);(Land=plain,P1=1)),
 	%--Si la dirección es distinta el costo aumenta en 1
 	((DirV=Dir,P2=0);(DirV\=Dir,P2=1)),
 	
@@ -83,54 +100,44 @@ adyacente(PosDir,PosDirV,P):-
 %--============================================================================
 generar_vecinos(Nodo):-
 	nodo_eti(Nodo,E),nodo_cam(Nodo,C),nodo_cos(Nodo,G),
+	E=[PosE,_],
 	forall(
+		adyacente(E,NodoV,P),
 		(
-			adyacente(E,NodoV,P),
-			NodoV=[PosV,_],
-			%--celda_libre(PosV,G),
-			
-			E=[PosE,_],
-			not(abierto([NodoV,_,_,_])),
-			not(cerrado([NodoV,_,_,_]))
-		),
-		(
-			h(NodoV,HNV),
-			(GNV is G+P),
-			assert(abierto([NodoV,HNV,[PosE|C],GNV]))
-		)
-	),
-	forall(
-		(
-			adyacente(E,NodoV,P),
-			NodoV=[PosV,_],
-			%--celda_libre(PosV,G),
-			
-			E=[PosE,_],
-			abierto([NodoV,_,_,NodoVG]),
-			(GNV is G+P),
-			(GNV<NodoVG)
-		),
-		(
-			retract(abierto([NodoV,_,_,NodoVG])),
-			h(NodoV,HNV),
-			assert(abierto([NodoV,HNV,[PosE|C],GNV]))
-		)
-	),
-	forall(
-		(
-			adyacente(E,NodoV,P),
-			NodoV=[PosV,_],
-			%--celda_libre(PosV,G),
-			
-			E=[PosE,_],
-			cerrado([NodoV,_,_,NodoVG]),
-			(GNV is G+P),
-			(GNV<NodoVG)
-		),
-		(
-			retract(cerrado([NodoV,_,_,NodoVG])),
-			h(NodoV,HNV),
-			assert(abierto([NodoV,HNV,[PosE|C],GNV]))
+			GNV is G+P,
+			(
+				(
+					not(abierto([NodoV,_,_,_])),
+					not(cerrado([NodoV,_,_,_])),
+					h(NodoV,HNV),
+					
+					assert(abierto([NodoV,HNV,[PosE|C],GNV]))
+				);
+				(
+					abierto([NodoV,NodoVH,_,NodoVG]),
+					(GNV<NodoVG),
+					
+					retract(abierto([NodoV,_,_,NodoVG])),
+					assert(abierto([NodoV,NodoVH,[PosE|C],GNV]))
+				);
+				(
+					cerrado([NodoV,NodoVH,_,NodoVG]),
+					(GNV<NodoVG),
+					
+					retract(cerrado([NodoV,_,_,NodoVG])),
+					assert(abierto([NodoV,NodoVH,[PosE|C],GNV]))
+				);
+				(
+					(
+						abierto([NodoV,NodoVH,_,NodoVG]);
+						cerrado([NodoV,NodoVH,_,NodoVG])
+					),
+					(
+						(GNV>NodoVG);
+						(GNV=NodoVG)
+					)
+				)
+			)
 		)
 	),
 	retract(abierto(Nodo)),assert(cerrado(Nodo)).
@@ -147,23 +154,38 @@ seleccionarA(Nodo):-
 		)
 	).
 
-buscarA([PosE|SSol]):-
+buscarA([PosE|SSol],Prof):-
 	seleccionarA(Nodo),
 	Nodo=[NodoE,_,SSol,_],
-	NodoE=[PosE,_],
+	NodoE=[PosE,DirE],
 	
 	%--No importa la dirección VER
-	esMeta([PosE,_]).
-buscarA(Sol):-
+	esMeta([PosE,DirE]).
+	
+	%--write('################################Profundidad='),write(Prof),nl
+	
+buscarA(Sol,Prof):-
+	cota_prof(CotaP),
+	Prof<CotaP,
+	
+/*	write('Profundidad #'),write(Prof),nl,*/
+
 	seleccionarA(Nodo),
+/*	write('Nodo seleccionado |='),write(Nodo),nl,
+	mostrar_abiertos,nl,
+	mostrar_cerrados,nl,nl,*/
 	generar_vecinos(Nodo),
 	
-	buscarA(Sol).
+	ProfSig is Prof+1,
+	buscarA(Sol,ProfSig).
 
-empezar(NodoE,Metas,Sol):-
+empezar(NodoE,Metas,Sol,CotaP):-
 	resetear_abiertos,
 	resetear_cerrados,
 	resetear_metas,
+	
+	retractall(cota_prof(_)),
+	assert(cota_prof(CotaP)),
 	
 	forall(
 		member(Meta,Metas),		
@@ -173,6 +195,27 @@ empezar(NodoE,Metas,Sol):-
 	h(NodoE,HN),
 	Nodo=[NodoE,HN,[],0],
 	
-	assert(abierto(Nodo)),
+	%--assert(abierto(Nodo)),
 	
-	buscarA(Sol).
+	%--Permite utilizar la versión mas eficiente de adyacente, que no genera
+	%--caminos para atras
+	(
+		(
+			esMeta(NodoE),
+			Sol=[]
+		);
+		(
+			not(esMeta(NodoE)),
+			
+			NodoE=[PosE,_],
+			forall(
+				adyacente_pos_ini(NodoE,NodoV,P),
+				(
+					h(NodoV,HNV),
+					assert(abierto([NodoV,HNV,[PosE],P]))
+				)
+			),
+			
+			buscarA(Sol,0)
+		)
+	).

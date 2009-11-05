@@ -624,15 +624,73 @@ porcentaje_grilla(Porc):-
 %--caminata(+Action), caminata al azar que prioriza lugares que no
 %--visito todabia
 caminata(Action):-
+	pos_act(PosAg),
+	dir_act(DirAg),
+	
+	estado_grilla(Grilla),
+	
+	write('Ya descubrí toda la grilla? '),
+	%--Si no descubrió toda la grilla, busca explorar
+	porcentaje_grilla(Porc),
+	Porc<100,
+	
+	%--Busca todos las celdas adyacentes a celdas conocidas, que no fueron
+	%--percibidas todabía
+	findall(
+		[Pos,Dir],
+		(
+			member(Celda,Grilla),
+			Celda=[Pos,Land,_],
+
+			Land\=forest,Land\=water,
+
+			%--adyacente(Pos,PosAdy),
+			ady_at_cardinal(Pos,Dir,PosAdy),
+			CeldaAdy=[PosAdy,_,_],
+			not(member(CeldaAdy,Grilla))
+		),
+		Inexplorados
+	),
+	
+	write('No, y creo que hay terreno por explorar cerca de '),
+	write(Inexplorados),nl,
+	write('Voy a ver si puedo llegar hasta allí'),nl,
+	
+	%--Busca el camino mas corto a una de las celdas inexploradas
+	empezar([PosAg,DirAg],Inexplorados,SolR,100),
+	reverse(SolR,Sol),
+	
+	%--Actualiza la meta actual
+	SolR=[Pos|_],
+	retractall(meta_act(_)),
+	assert(meta_act(Pos)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(unknown)),
+	
+	%--Actualiza el camino a seguir
+	retractall(camino_meta(_)),
+	assert(camino_meta(Sol)),
+	
 	%--Determina la acción necesaria para avanzar en el camino obtenido
 	seguir_camino(Action),
 	
 	write('Si puedo llegar, ya me pongo en marcha'),nl.
 caminata(Action):-
-	camino_meta(Camino),
-	Camino=[],
-	write('No hay ninguna meta, me pongo a caminar'),nl,
+	porcentaje_grilla(Porc),
+	(
+		(
+			%--Si ya visitó todas las celdas observables, camina al azar
+			Porc=100,
+			write('Si, no se donde ir, voy a caminar sin rumbo'),nl
+		);
+		(
+			%--Si no visitó todas las celdas observables, pero no encontro un camino
+			Porc<100,
+			write('No, no se donde ir, voy a caminar sin rumbo'),nl
+		)
+	),
 	walkabout_accion(Action).
+	
 	
 %-- SELECCION==================================================================	
 %--Si hay un agente enfrente lo ataca
@@ -781,7 +839,7 @@ act_metas:-
 	
 	nl,write('Estos son los que encontre:'),write(Hosteles),nl,
 	
-	empezar([PosAg,DirAg],Hosteles,SolR,50),!,
+	empezar([PosAg,DirAg],Hosteles,SolR,150),!,
 	reverse(SolR,Sol),
 	
 	write('Siguiendo este nuevo camino:'),write(Sol),nl,
@@ -840,7 +898,7 @@ act_metas:-
 	
 	nl,write('Estos son los que encontre:'),write(Tesoros),nl,
 	
-	empezar([PosAg,DirAg],Tesoros,SolR,40),!,
+	empezar([PosAg,DirAg],Tesoros,SolR,30),!,
 	reverse(SolR,Sol),
 	
 	write('Voy a actualizar mis metas de riquezas...'),nl,
@@ -857,67 +915,19 @@ act_metas:-
 act_metas:-
 	write('No'),nl,
 	write('No hay algo nuevo que buscar?, no tengo ningun camino nuevo a seguir? '),
-	pos_act(PosAg),
-	dir_act(DirAg),
+	camino_meta(VMeta),
+	nuevos_objetos(NObjs),
+	NObjs\=1,
 	
-	estado_grilla(Grilla),
+	estado_objetos(Objetos),
+	member(Obj,Objetos),
+	Obj=[_Pos,Cosa,_Tur],
 	
-	write('Ya descubrí toda la grilla? '),
-	%--Si no descubrió toda la grilla, busca explorar
-	porcentaje_grilla(Porc),
-	Porc<100,
+	not(es_tesoro(Cosa)),
+	nl,write('Y lo que hay no me convence...'),nl,
 	
-	%--Busca todos las celdas adyacentes a celdas conocidas, que no fueron
-	%--percibidas todabía
-	findall(
-		[Pos,Dir],
-		(
-			member(Celda,Grilla),
-			Celda=[Pos,Land,_],
-
-			Land\=forest,Land\=water,
-
-			%--adyacente(Pos,PosAdy),
-			ady_at_cardinal(Pos,Dir,PosAdy),
-			CeldaAdy=[PosAdy,_,_],
-			not(member(CeldaAdy,Grilla))
-		),
-		Inexplorados
-	),
-	
-	write('No, y creo que hay terreno por explorar cerca de '),
-	write(Inexplorados),nl,
-	write('Voy a ver si puedo llegar hasta allí'),nl,
-	
-	%--Busca el camino mas corto a una de las celdas inexploradas
-	empezar([PosAg,DirAg],Inexplorados,SolR,60),!,
-	reverse(SolR,Sol),
-	
-	%--Actualiza la meta actual
-	SolR=[Pos|_],
-	retractall(meta_act(_)),
-	assert(meta_act(Pos)),
-	retractall(tipo_meta(_)),
-	assert(tipo_meta(unknown)),
-	
-	%--Actualiza el camino a seguir
-	retractall(camino_meta(_)),
-	assert(camino_meta(Sol)).
-act_metas:-
-	porcentaje_grilla(Porc),
-	(
-		(
-			%--Si ya visitó todas las celdas observables, camina al azar
-			Porc=100,
-			write('Si, no se donde ir, voy a caminar sin rumbo'),nl
-		);
-		(
-			%--Si no visitó todas las celdas observables, pero no encontro un camino
-			Porc<100,
-			write('No, no se donde ir, voy a caminar sin rumbo'),nl
-		)
-	),
-	fail.
+	write('No actualizo mis metas'),nl,
+	write('Continuo con el camino:'),write(VMeta),nl.
 act_metas:-
 	write('No'),nl,
 	write('No vi nada en mis viajes? '),

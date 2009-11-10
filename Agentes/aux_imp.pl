@@ -8,6 +8,10 @@ imp_info_act_ag:-
 	write('Nombre: '),write(AgName),nl,
 	pos_act(Pos),
 	write('Posición: '),write(Pos),nl,
+	pos_previa(PosPrev),
+	write('Posición previa: '),write(PosPrev),nl,
+	accion_previa(AccPrev),
+	write('Acción previa: '),write(AccPrev),nl,
 	dir_act(Dir),
 	write('Direccion: '),write(Dir),nl,
 	sta_act(Sta),
@@ -28,6 +32,8 @@ imp_info_act_ag:-
 	write('METAS ACTUALES ========================='),nl,
 	meta_act(Meta),
 	write('Meta: '),write(Meta),nl,
+	tipo_meta(TMeta),
+	write('Tipo de meta: '),write(TMeta),nl,
 	camino_meta(CMeta),
 	write('Camino a meta: '),write(CMeta),nl,nl.
 

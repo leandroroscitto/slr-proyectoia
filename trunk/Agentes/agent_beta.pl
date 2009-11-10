@@ -11,12 +11,12 @@
 :-consult(busqueda).
 
 %-- PREDICADOS DINAMICOS=======================================================
-%--estado_objetos(Obs), con Obs es una lista de objetos del tipo
+%--estado_objetos(-Objs), con Objs es una lista de objetos del tipo
 %--[Posicion,Objeto,UltimoTurnoVisto], con Objeto=[Tipo,Nombre,Descripción]
 %--Representación interna de los objetos que fueron percibidos por el agente,
 %--y cual fue el último turno en el que se los vió
 :-dynamic estado_objetos/1.
-%--estado_grilla(Grilla), con Grilla una lista de celdas del tipo
+%--estado_grilla(-Grilla), con Grilla una lista de celdas del tipo
 %--[Posicion,TipoTierra,Visitado]
 %--Representación interna de la geografía del entorno percibida por el agente
 :-dynamic estado_grilla/1.
@@ -36,6 +36,11 @@
 %--Habilidad de pelea actual del agente
 :-dynamic fs_act/1.
 
+%--accion_previa(-Accion), Accion realizada en el turno anterior al actual
+:-dynamic accion_previa/1.
+%--pos_previa(-Pos), Pos representa la posición en el último turno persivido
+:-dynamic pos_previa/1.
+
 %--camino_meta(Camino), Camino es una lista de posiciones que seguirá el agente
 %--con destino a una meta, de no presentarse alguna situación de mayor prioridad
 :-dynamic camino_meta/1.
@@ -45,10 +50,16 @@
 %--tipo_meta(Tipo), Tipo pertenece {treasure,hostel,unknown}, indica el tipo
 %--de meta que indica la posición
 :-dynamic tipo_meta/1.
-%--Representa el descubrimiento de nuevos objetos desde la última percepción
-:-dynamic nuevos_objetos/1.
+%--nuevos_tesoros representa el descubrimiento de nuevos tesoros desde la última percepción si Hay=1
+:-dynamic nuevos_tesoros/0.
 %--Representa el descubrimiento de nuevas celdas de la grilla
 :-dynamic nuevas_celdas/0.
+%--VER: Nuevos agentes(?)
+
+%--esperar(Turnos), Turnos es la cantidad de turnos dedicados a realizar alguna acción especial
+:-dynamic esperar/1.
+%--peligro_agente determina si exiten agentes enemigos en las cercanias
+:-dynamic peligro_agente/0.
 
 %--ag_name(Nombre), representa el Nombre del agente
 :-dynamic ag_name/1.
@@ -72,6 +83,9 @@ msta_act(-1).
 dir_act(-1).
 inv_act([]).
 fs_act(-1).
+
+accion_previa(-1).
+pos_previa([-1,-1]).
 
 %--En un principio no existe ninguna meta ni un camino hacia alguna
 meta_act(null).
@@ -176,6 +190,15 @@ no_es_si_mismo(Cosa):-
 	ag_name(NAgente),
 	NCosa\=NAgente.
 
+%--estoy_condiciones_pelear, determina si esta en condiciones de pelear contra
+%--otro agente (se considera cuando tiene mas de 2 tercios de la máxima stamina
+estoy_condiciones_pelear:-
+	sta_act(Sta),
+	msta_act(MSta),
+	
+	MSta32 is (MSta*2/3),
+	Sta>MSta32.
+
 %--eliminar(+Elemento,+List,-ListR), elimina un elemento de una lista, pertenezca
 %--o no a esta
 eliminar(_Ele,[],[]).
@@ -274,6 +297,34 @@ ir_a_pos_ady(PosDest,Accion):-
 	
 	Accion=turn(Dir).
 
+%--quemar_energia(-Action), determina la acción para quemera energia sin 
+%--moverse del lugar, si la cantidad de turnos es mayor que 0
+%--VER:SIRVE?
+quemar_energia(Action):-
+	esperar(CantTurn);
+	CantTurn>0;
+	dir_act(DirAct),
+	dir_opuesta(DirAct,DirOp),
+	Action=turn(DirOp).
+
+/* VER: BUSCAR MANERA DE EVITAR EL HOSTEL, RECALCULANDO EL CAMINO A LA MISMA META, PERO CONSIDERANDO LA CELDA DEL HOSTEL COMO NO PASABLE
+seguir_camino(Accion):-
+	pos_act(PosAct),
+	pos_previa(PosPrev),
+	accion_previa(AccPrev),
+	
+	%--Si la acción previa fue avanzar, y la posición no cambio,
+	%--supone que está en la situación del hostel bloqueado,
+	%--intenta gastar 2 puntos de energia para poder pasar
+	AccPrev=move_fwd,
+	PosAct=PosPrev,
+	
+	retractall(esperar(_)),
+	assert(esperar(2)),
+	
+	quemar_energia(Accion).
+*/
+
 %--seguir_camino(-Accion), determina la accion para seguir un camino a una meta
 seguir_camino(_Accion):-
 	%--Si no hay camino a seguir, se retrae la meta actual y falla
@@ -361,7 +412,7 @@ act_estado_visita(Pos):-
 %--act_estado_objetos(+TurAct,+Vis), actualiza la representación interna
 %--de los objetos del entorno, agregando o modificando los objetos a partir
 %--de la visión de la percepción actual
-act_estado_objetos(TurAct,Vis):-
+act_estado_objetos(Vis,TurAct):-
 	%--Obtiene la lista de objetos observados en la percepción
 	procesar_vis(Vis,TurAct,VObjetos),
 	%--Obtiene la representación interna de los objetos percibidos por el agente
@@ -411,35 +462,20 @@ act_estado_objetos(TurAct,Vis):-
 	%--tres conjuntos construidos
 	append([NObjetosNoRep,NObjetosRep,NObjetosDif],NObjetos),
 	
-	%--Indica el hecho de que se modificó el conjunto de objetos percibidos
-	%--Solo considera los objetos y la posición, no el turno en que fueron
-	%--vistos
-	/*
-	(
-		(
-			mismos_objetos(EIObjetos,NObjetos),
-			retractall(nuevos_objetos(_)),
-			assert(nuevos_objetos(0))
-		);
-		(
-			retractall(nuevos_objetos(_)),
-			assert(nuevos_objetos(1)),
-			write('Encontre nuevos objetos...'),nl)
-	),
-	*/
+	%--Indica el hecho de que se modificó el conjunto de tesoros percibidos
+	%--En el caso de que existan tesoros percibidos en algún momento que no
+	%--fueron recogidos por el agente o no se comprobó que no se encuentran más
+	%--en el lugar, lo indica
 	%--VER
 	(
 		(
 			member([_,Cosa,_],NObjetos),
 			es_tesoro(Cosa),
-			retractall(nuevos_objetos(_)),
-			assert(nuevos_objetos(1)),
-			write('Encontre nuevos objetos...')
+			retractall(nuevos_tesoros),
+			assert(nuevos_tesoros),
+			write('Encontre nuevos tesoros...'),nl
 		);
-		(
-			retractall(nuevos_objetos(_)),
-			assert(nuevos_objetos(0))
-		)
+		retractall(nuevos_tesoros)
 	),
 	
 	retractall(estado_objetos(EIObjetos)),
@@ -453,10 +489,10 @@ act_estado_ent(Perc):-
 	retractall(turno_act(_)),
 	assert(turno_act(Tur)),
 	
-	%--Actualiza la grilla y la representación de los objetos internas
+	%--Actualiza la grilla y la representación de los objetos internos
 	get_pos_attr(Attr,PosAct),
 	act_estado_grilla(Vis,PosAct),
-	act_estado_objetos(Tur,Vis).
+	act_estado_objetos(Vis,Tur).
 
 %--act_estado_ag(+Perc), actualiza el estado interno de los atribtutos del agente
 act_estado_ag(Perc):-
@@ -484,7 +520,11 @@ act_estado_ag(Perc):-
 	
 	%--Actualiza el inventario actual del agente
 	retractall(inv_act(_)),
-	assert(inv_act(Inv)).
+	assert(inv_act(Inv)),
+	
+	%--Actualizar la posición previa del agente
+	retractall(pos_previa(_)),
+	assert(pos_previa([0,0])).
 
 %-- SELECCION DE ACCION========================================================
 
@@ -634,22 +674,121 @@ caminata(Action):-
 	write('No hay ninguna meta, me pongo a caminar'),nl,
 	walkabout_accion(Action).
 	
-%-- SELECCION==================================================================	
-%--Si hay un agente enfrente lo ataca
+%-- SELECCION==================================================================
+%-- La selección del acción depende de las prioridades del agente
+
+%--diagd_at_cardinal(+Pos,+Dir,-Posdiagd), devuelve la posición diagonal 
+%--derecha a partir de la dirección
+diagd_at_cardinal([F,C],n,[PredF,SuccC]):-next(PredF,F),next(C,SuccC).
+diagd_at_cardinal([F,C],s,[SuccF,PredC]):-next(F,SuccF),next(PredC,C).
+diagd_at_cardinal([F,C],e,[SuccF,SuccC]):-next(F,SuccF),next(C,SuccC).
+diagd_at_cardinal([F,C],w,[PredF,PredC]):-next(PredF,F),next(PredC,C).
+
+%--diagi_at_cardinal(+Pos,+Dir,-Posdiagi), idem para diagonal izquierda
+diagi_at_cardinal([F,C],n,[PredF,SuccC]):-next(PredF,F),next(C,SuccC).
+diagi_at_cardinal([F,C],s,[SuccF,PredC]):-next(F,SuccF),next(PredC,C).
+diagi_at_cardinal([F,C],e,[SuccF,SuccC]):-next(F,SuccF),next(C,SuccC).
+diagi_at_cardinal([F,C],w,[PredF,PredC]):-next(PredF,F),next(PredC,C).
+
+%--Si hay un agente alcanzable y él está en condiciones de pelear, lo ataca
 sel_accion(Action):-
 	pos_act(Pos),
 	dir_act(Dir),
+	turno_act(TurnAct),
 	
-	ady_at_cardinal(Pos,Dir,PosAdy),
-	objetos_en_pos(PosAdy,Objetos),
+	%--Si ya sabe que está en peligro, no calcula todo nuevamente
+	not(peligro_agente),
 	
-	member(Obj,Objetos),
-	Obj=[Tipo,Nombre,_Desrip],
-	Tipo=agent,
+	%--Busca agentes en todas las posiciones atacables (enfrente,
+	%--diagonal derecha e izquierda) en el turno actual. Se podría implementar que ataque
+	%--a alguno en particular de acuerdo a alguna condición,
+	%--por ahora elige un cualquiera
+	findall(
+		Ag,
+		(
+			estado_objetos(Objetos),
+			member(Obj,Objetos),
+			Obj=[PosAg,Ag,TurnAct],
+			Ag=[agent,_,_],
+			(
+				ady_at_cardinal(Pos,Dir,PosAg);
+				diagd_at_cardinal(Pos,Dir,PosAg);
+				diagi_at_cardinal(Pos,Dir,PosAg)
+			)
+		),
+		Agentes
+	),
+	
+	member(Agente,Agentes),
+	Agente=[_,Nombre,_],
+	
+	%--Indica que hay peligro, exiten agentes en posición atacable
+	%--(posiblemente ellos pueden atacar también)
+	retractall(peligro_agente),
+	assert(peligro_agente),
+	
+	%--Verifica que este en condiciones de pelear
+	estoy_condiciones_pelear,
 	
 	write('Vi al agente '),write(Nombre),write(', lo voy a atacar'),nl,
 	
 	Action=attack(Nombre).
+
+%--Hay agentes demasiado cerca, y no esta en condiciones de pelear, 
+%--busca refujio en un hostel
+sel_accion(Action):-
+	peligro_agente,
+	not(estoy_condiciones_pelear),
+	
+	%--Verifica si ya está camino a un hostel
+	tipo_meta(hostel),
+	
+	pos_act(PosAg),
+	dir_act(DirAg),
+	
+	%--Busca todas las celdas donde exita un hostel
+	findall(
+		[Pos,Dir],
+		(
+			estado_objetos(Objetos),
+			member(Obj,Objetos),
+			Obj=[Pos,Cosa,_Tur],
+			
+			dir_posible(Dir), %--VER
+			
+			es_hostel(Cosa)
+		),
+		Hosteles
+	),
+	
+	(
+		(	
+			%--Si encontró hosteles, busca un camino a alguno
+			Hosteles\=[],
+			empezar([PosAg,DirAg],Hosteles,SolR,40),
+			(
+				(
+					%--Si encontró un camino, lo sigue
+					SolR=[Meta|_SSolR],
+					reverse(SolR,Sol),%--DEVERIA FALLAR ACA SI DEVUELVE null
+					retractall(meta_act(_)),
+					assert(meta_act(Meta)),
+					retractall(camino_meta(_)),
+					assert(camino_meta(Sol)),
+					seguir_camino(Action)
+				);
+				(
+					%--Si no encontró un camino VER
+					(SolR=[];Sol=null)
+				)
+			)
+		);
+		(
+			%--Si no encontró hosteles VER IDEM SolR=[]
+			Hosteles=[]
+		)
+	).
+	
 %--Si hay un tesoro en el piso lo levanta
 sel_accion(Action):-
 	pos_act(Pos),
@@ -664,7 +803,9 @@ sel_accion(Action):-
 	write(' en esta posición, voy intentar levantarlo'),nl,
 	
 	Action=pickup(Nombre).
+	
 %--Si no esta a full de stamina, se queda esperando en un hostel
+/* VER: REALMENTE PUEDE JODER
 sel_accion(Action):-
 	sta_act(Sta),
 	msta_act(MSta),
@@ -688,37 +829,34 @@ sel_accion(Action):-
 	assert(camino_meta([])),%--PARCHE
 	
 	Action=null_action.
+*/
 
+%--Si no necesita realizar ninguna acción mas prioritaria, sigue por el camino
 sel_accion(Action):-
 	write('Estaba llendo a algún lado?'),nl,
-	seguir_camino(Action),!,
+	seguir_camino(Action), %--VER:SAQUE EL !
 	write('Si estaba siguiendo el camino'),nl.
 
+%--Si no hay camino a seguir, busca celdas inexploradas
 sel_accion(Action):-
 	write('No, mejor voy a explorar un toque a ver que hay'),nl,
 	caminata(Action),!.
-	
+
+%--No hay camino a seguir, no hay celdas inexploradas, y no tiene nada que hacer
+%--Nunca debería ocurrir
 sel_accion(null_action):-
 	write('Como que no voy a hacer nada'),nl.
 
 %-- ACTUALIZAR LAS METAS DEL AGENTE============================================
-eliminar_inaccesibles(Tesoros,TesAcc):-
-	findall(
-		Tes,
-		(
-			member(Tes,Tesoros),
-			Tes=[Pos,_],
-			adyacente(Pos,PosA),
-			celda_libre(PosA,0),
-			adyacente(PosA,PosAA),
-			PosAA\=Pos,
-			celda_libre(PosAA,0)
-		),
-		TesR
-	),
-	list_to_set(TesR,TesAcc).
-
+%--Actualización de metas de acuerdo con las prioridades del agente
 act_metas:-
+	act_metas_supervivencia;
+	act_metas_tesoros;
+	act_metas_exploracion;
+	act_metas_generales.
+
+%--METAS DE SUPERVIVENCIA (DESCANSO, ATAQUE Y HUIDA)
+act_metas_supervivencia:-
 	write('Estoy suficientemente cansado para buscar refujio? '),
 	sta_act(StaAg),
 	%--msta_act(MStaAg),
@@ -745,7 +883,7 @@ act_metas:-
 	not(nuevas_celdas),
 	
 	nl,write('Si lo estoy, pero ya estoy en camino a un hostel'),nl.
-act_metas:-
+act_metas_supervivencia:-
 	sta_act(StaAg),
 	%--msta_act(MStaAg),
 	
@@ -781,8 +919,8 @@ act_metas:-
 	
 	nl,write('Estos son los que encontre:'),write(Hosteles),nl,
 	
-	empezar([PosAg,DirAg],Hosteles,SolR,50),!,
-	reverse(SolR,Sol),
+	empezar([PosAg,DirAg],Hosteles,SolR,50),
+	reverse(SolR,Sol),%--DEVERIA FALLAR ACA SI DEVUELVE null
 	
 	write('Siguiendo este nuevo camino:'),write(Sol),nl,
 	
@@ -794,27 +932,22 @@ act_metas:-
 	
 	retractall(camino_meta(_)),
 	assert(camino_meta(Sol)).
-act_metas:-
-	write('No'),nl,
-	write('Habrá algun tesoro nuevo, o un mejor camino por conseguir? '),
-	%--camino_meta(VMeta),
-	
-	nuevos_objetos(NObjs),
-	NObjs=1,
 
-	/*
-	(
-		nuevos_objetos;
-		(nuevas_celdas,tipo_meta(treasure));
-		VMeta=[];
-		(
-			%--PARCHEPARCHEPARCHEPARCHE
-			msta_act(MSta),
-			sta_act(Sta),
-			(Sta=MSta)
-		)
-	),
-	*/
+%--METAS DE TESOROS (BUSQUEDA PRINCIPALMENTE)
+act_metas_tesoros:-
+	write('No estoy tan cansado'),nl,
+	nl,write('No habrá un tesoro en mis pies?'),
+	
+	pos_act(PosAct),
+	estado_objetos(Objetos),
+	member([PosAct,[treasure,_,_],_],Objetos),
+	
+	nl,write('Si lo hay, supongo que lo levantaré, nose...'),nl.
+act_metas_tesoros:-
+	write('No'),nl,
+	write('Habrá algun tesoro nuevo en otro lado, o un mejor camino por conseguir? '),
+	
+	nuevos_tesoros,
 		
 	pos_act(PosAg),
 	dir_act(DirAg),	
@@ -833,17 +966,17 @@ act_metas:-
 		Tesoros
 	),
 	
-	%--eliminar_inaccesibles(TesorosR,Tesoros),
-	
-	nl,write('Conozco algún tesoro?'),
+	nl,write('Conozco algún tesoro? '),
 	Tesoros\=[],
 	
 	nl,write('Estos son los que encontre:'),write(Tesoros),nl,
 	
-	empezar([PosAg,DirAg],Tesoros,SolR,40),!,
-	reverse(SolR,Sol),
+	write('Voy a ver si puedo alcanzar alguno...'),nl,
 	
-	write('Voy a actualizar mis metas de riquezas...'),nl,
+	empezar([PosAg,DirAg],Tesoros,SolR,40),
+	reverse(SolR,Sol),%--DEVERIA FALLAR ACA SI DEVUELVE null
+	
+	write('Puedo alcanzar uno, voy a actualizar mis metas de riquezas...'),nl,
 	write('En base a este nuevo camino a seguir:'),write(Sol),nl,
 	
 	SolR=[Meta|_],
@@ -854,8 +987,10 @@ act_metas:-
 	
 	retractall(camino_meta(_)),
 	assert(camino_meta(Sol)).
-act_metas:-
-	write('No'),nl,
+
+%--METAS DE EXPLORACION DE TERRENO INEXPLORADO
+act_metas_exploracion:-
+	nl,write('No conozco ninguno, o no pude encontra un camino a el (corte en la busqueda)'),nl,
 	write('No hay algo nuevo que buscar?, no tengo ningun camino nuevo a seguir? '),
 	pos_act(PosAg),
 	dir_act(DirAg),
@@ -890,8 +1025,11 @@ act_metas:-
 	write('Voy a ver si puedo llegar hasta allí'),nl,
 	
 	%--Busca el camino mas corto a una de las celdas inexploradas
-	empezar([PosAg,DirAg],Inexplorados,SolR,60),!,
-	reverse(SolR,Sol),
+	empezar([PosAg,DirAg],Inexplorados,SolR,60),
+	reverse(SolR,Sol),%--DEVERIA FALLAR ACA SI DEVUELVE null
+	
+	write('Si puedo llegar, ya me pongo en marcha, creo...'),nl,
+	write('Este sería el camino: '),write(Sol),nl,
 	
 	%--Actualiza la meta actual
 	SolR=[Pos|_],
@@ -903,7 +1041,7 @@ act_metas:-
 	%--Actualiza el camino a seguir
 	retractall(camino_meta(_)),
 	assert(camino_meta(Sol)).
-act_metas:-
+act_metas_exploracion:-
 	porcentaje_grilla(Porc),
 	(
 		(
@@ -918,20 +1056,21 @@ act_metas:-
 		)
 	),
 	fail.
-act_metas:-
-	write('No'),nl,
-	write('No vi nada en mis viajes? '),
+
+%--METAS GENERALES
+act_metas_generales:-
+	nl,write('No vi nada en mis viajes? '),
 	estado_objetos(Objetos),
 	Objetos=[],
-	nl,write('Tampoco actualizo mis metas'),nl,
+	nl,write('No, tampoco actualizo mis metas'),nl,
 	write('Quizas seguiré el camino anterior'),nl.
-act_metas:-
+act_metas_generales:-
 	write('No'),nl,
 	camino_meta(VMeta),
 	VMeta\=[],
 	write('Nada nuevo a que aspirar...'),nl,
 	write('Seguiré por el camino en que venia:'),write(VMeta),nl.
-act_metas:-
+act_metas_generales:-
 	write('No tengo ningún camino que seguir?'),nl,
 	camino_meta(VMeta),
 	VMeta=[],
@@ -947,16 +1086,25 @@ run:-
 	get_percept(Perc),
 	
 	Perc=[TurnAct,_,_,_],
-	nl,write('Turno:'),write(TurnAct),write(' --------'),nl,
+	nl,write('Turno:'),write(TurnAct),write('---------------------------'),nl,
 	
 	act_estado_ent(Perc),
 	act_estado_ag(Perc),
 	
 	imp_info_act_ag,
 	
-	act_metas,!,
+	nl,write('ACTUALIZACION DE METAS=========================================='),nl,
+	act_metas,!, %--No hay vuelta atras
 	
-	sel_accion(Action),
+	nl,write('SELECCION DE ACCION============================================='),nl,
+	sel_accion(Action),!, %--No hay vuelta atras
+	
+	pos_act(PosAct),
+	retractall(accion_previa(_)),
+	assert(accion_previa(Action)),
+	retractall(pos_previa(_)),
+	assert(pos_previa(PosAct)),
+	
     do_action(Action),
     run.
 

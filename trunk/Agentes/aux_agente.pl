@@ -104,7 +104,7 @@ celda_libre(Pos,TurnoFut):-
 
 %--no_es_si_mismo(+Cosa), determina si una cosa no es un agente, y en el caso
 %--de serlo que no sea él mismo
-no_es_si_mismo(Cosa):-not(es_agente(Cosa)),!.
+no_es_si_mismo(Cosa):-not(es_agente(Cosa)).
 no_es_si_mismo(Cosa):-
 	es_agente(Cosa),
 	nombre_cosa(Cosa,NCosa),
@@ -168,15 +168,16 @@ reemplazar(Ele1,Ele2,List1,List2):-
 	append([SList11,[Ele2],SList12],List1),
 	append([SList11,[Ele1],SList12],List2).
 
-%--objetos_en_pos(+Pos,-Objs), devuelve una lista de todos los objetos
-%--[Tipo,Objeto,Descr] registrados en el estado interno dada una posicion
-objetos_en_pos(Pos,Objs):-
+%--objetos_en_pos(+Pos,+Tipo,-Objs), devuelve una lista de todos los objetos
+%--[Tipo,Nombre,Descr] registrados en el estado interno dada una posicion
+objetos_en_pos(Pos,Tipo,Objs):-
 	estado_objetos(Objetos),
 	findall(
 			Obj,
 			(
 				member(Cosa,Objetos),
-				Cosa=[Pos,Obj,_Tur]
+				Cosa=[Pos,Obj,_Tur],
+				Obj=[Tipo,_,_]
 			),
 			Objs
 		).

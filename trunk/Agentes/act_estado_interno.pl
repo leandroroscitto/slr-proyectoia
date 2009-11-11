@@ -76,7 +76,21 @@ act_estado_objetos(Vis,TurAct):-
 			member(Obj,VObjetos),
 			Obj=[Pos,Cosa,Tur],
 			no_es_si_mismo(Cosa),
-			not(member([_,Cosa,_],EIObjetos))
+			
+			%--Tiene que considerar si el objeto es un agente,
+			%--ya que en ese caso su descripción puede variar
+			Cosa=[Tipo,Nombre,_],
+			(
+				(
+					Tipo=agent,
+					not(member([_,[agent,Nombre,_],_],EIObjetos))
+				);
+				(
+					Tipo\=agent,
+					not(member([_,Cosa,_],EIObjetos))
+				)
+			)
+			%--not(member([_,Cosa,_],EIObjetos))
 		),
 		NObjetosNoRep
 	),
@@ -88,7 +102,21 @@ act_estado_objetos(Vis,TurAct):-
 			member(Obj,VObjetos),
 			Obj=[Pos,Cosa,Tur],
 			no_es_si_mismo(Cosa),
-			member([Pos,Cosa,_],EIObjetos)
+			
+			%--Tiene que considerar si el objeto es un agente,
+			%--ya que en ese caso su descripción puede variar
+			Cosa=[Tipo,Nombre,_],
+			(
+				(
+					Tipo=agent,
+					member([Pos,[agent,Nombre,_],_],EIObjetos)
+				);
+				(
+					Tipo\=agent,
+					member([Pos,Cosa,_],EIObjetos)
+				)
+			)
+			%--member([Pos,Cosa,_],EIObjetos)
 		),
 		NObjetosRep
 	),
@@ -101,7 +129,21 @@ act_estado_objetos(Vis,TurAct):-
 			member(Obj,EIObjetos),
 			Obj=[Pos,Cosa,Tur],
 			no_es_si_mismo(Cosa),
-			not(member([_,Cosa,_],VObjetos)),
+			
+			%--Tiene que considerar si el objeto es un agente,
+			%--ya que en ese caso su descripción puede variar
+			Cosa=[Tipo,Nombre,_],
+			(
+				(
+					Tipo=agent,
+					not(member([_,[agent,Nombre,_],_],VObjetos))
+				);
+				(
+					Tipo\=agent,
+					not(member([_,Cosa,_],VObjetos))
+				)
+			),
+			%--not(member([_,Cosa,_],VObjetos)),
 			not(member([Pos,_,_],Vis))
 		),
 		NObjetosDif

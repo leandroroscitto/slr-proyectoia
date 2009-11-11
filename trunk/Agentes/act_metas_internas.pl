@@ -223,7 +223,78 @@ act_metas_landmarks:-
 	land_generadas,
 	write('Pero no había ninguna al final, o no encontré un camino a alguna de ellas'),nl.
 
-%--METAS DE SUPERVIVENCIA (DESCANSO, ATAQUE Y HUIDA)
+%--METAS DE ATAQUE, BUSQUEDA DE ENEMIGOS Y PERSECUSION
+%--Solo considera esta linea de acción una vez que recorrió toda la grilla
+%--y no hay tesoros por levantar
+act_metas_ofensiva:-
+	%--Si la grilla ya fue completamente recorrida
+	porcentaje_grilla(Porc),
+	Porc=100,
+
+	pos_act(Pos),
+	dir_act(Dir),
+
+	findall(
+		%--Busca todos los agentes que fueron percibidos, sin
+		%--importar en que turno. Los agentes más cercanos serán
+		%--los que fueron vistos en turnos mas recientes
+		[PosAg,Dir],
+		(
+			estado_objetos(Objetos),
+			member(Obj,Objetos),
+			Obj=[PosAg,Ag,_Turno],
+			Ag=[agent,_,Desc],
+			write(Desc),
+			member([dir,Dir],Desc),
+			%--Deja en paz a los desmayados, pero se podría cambiar
+			member([unconscious,false],Desc)
+		),
+		Agentes
+	),
+	
+	%--En realidad debería encontrar los agentes mas cercanos que fueron
+	%--vistos hace poco, pero de no existir buscará de acuerdo a lo que
+	%--recuerda la última posición conocida de una agente
+	write('Hay algún agente al que le pueda ir a atacar?'),nl,
+
+	(
+		(
+			%--Si encontró algún agente continua
+			Agentes\=[],
+			write('Creo que hay, voy a ver si encuentro una forma de llegar a él'),nl
+		);
+		(
+			%--Si no encontró ninguno, falla
+			Agentes=[],
+			write('No, nunca me habré cruzado con otro agente...'),nl,
+			fail
+		)
+	),
+	
+	%--Se utiliza una profundidad de 60 para buscar agentes
+	empezar([Pos,Dir],Agentes,SolR,60),
+	reverse(SolR,Sol),
+	
+	write('Encontré una forma de alcanzarlo, voy a seguirlo'),nl,
+	
+	%--En el caso de encontrar el camino, indica las nuevas metas
+	SolR=[Meta|_],
+	retractall(meta_act(_)),
+	assert(meta_act(Meta)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(agent)),
+	
+	retractall(camino_meta(_)),
+	assert(camino_meta(Sol)).
+act_metas_ofensiva:-
+	%--En el caso de que no encontró un camino o no había agentes
+	%--que seguir
+	write('No encontré a nadie a quien seguir para atacar, ya veré lo que hago...'),nl,
+	%--Falla para continuar con los próximos cálculos de metas
+	fail.
+	
+
+%--METAS DE SUPERVIVENCIA (DESCANSO, ATAQUE DEFENSIVO Y HUIDA)
 %--Determina si hay agentes enemigos cerca
 act_metas_supervivencia:-
 	pos_act(Pos),
@@ -233,15 +304,17 @@ act_metas_supervivencia:-
 	%--Busca agentes en todas las posiciones atacables (enfrente,
 	%--diagonal derecha e izquierda) en el turno actual. Se podría implementar que ataque
 	%--a alguno en particular de acuerdo a alguna condición,
-	%--por ahora elige un cualquiera
+	%--por ahora elige uno cualquiera, que no esté inconciente
 	findall(
 		[Ag,PosAg],
 		(
 			estado_objetos(Objetos),
 			member(Obj,Objetos),
 			Obj=[PosAg,Ag,TurnAct],
-			Ag=[agent,_,_],
+			Ag=[agent,_,Desc],
+			member([unconscious,false],Desc),
 			(
+				Pos=PosAg;
 				ady_at_cardinal(Pos,Dir,PosAg);
 				diagd_at_cardinal(Pos,Dir,PosAg);
 				diagi_at_cardinal(Pos,Dir,PosAg)
@@ -316,7 +389,8 @@ act_metas_supervivencia:-
 			%--Si está en peligro y no en condiciones de pelear,
 			%--busca refujio
 			peligro_agente,
-			not(estoy_condiciones_pelear)
+			not(estoy_condiciones_pelear),
+			write('No estoy en condiciones de pelear y voy a buscar refujio'),nl
 		)
 	),
 	
@@ -587,6 +661,25 @@ act_metas_generales:-
 	
 	%--Limpia el estado interno del agente de metas no válidas
 	write('No, no hay ninguna meta'),nl,
+	retractall(meta_act(_)),
+	assert(meta_act(null)),
+	retractall(tipo_meta(_)),
+	assert(tipo_meta(null)).
+act_metas_generales:-
+	%--Tiene un camino que seguir, pero es un hostel
+	camino_meta(VMeta),
+	VMeta\=[],
+	tipo_meta(hostel),
+	
+	%--Y ya está bien de stamina, posiblemente fue pateado
+	sta_act(Sta),
+	msta_act(MSta),
+	Staplus is Sta+5,
+	(Staplus=MSta;Staplus>MSta),
+	
+	%-Resetea las metas
+	retracall(camino_meta(VMeta)),
+	assert(camino_meta([])),
 	retractall(meta_act(_)),
 	assert(meta_act(null)),
 	retractall(tipo_meta(_)),

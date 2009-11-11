@@ -38,8 +38,8 @@ dir_posible(n).
 
 %--dir_opuesta(+Dir,-DirOp), determina dada una dirección Dir, su dirección
 %--opuesta (180 grados) en DirOp
-dir_opuesta(e,o).
-dir_opuesta(o,e).
+dir_opuesta(e,w).
+dir_opuesta(w,e).
 dir_opuesta(s,n).
 dir_opuesta(n,s).
 
@@ -197,8 +197,6 @@ actualizar_ramas_por(NodoE,NuevoC,DifCosto):-
 		)
 	).
 			
-		
-
 %--generar_vecinos(+Nodo), expande un nodo seleccionado Nodo, buscando todos sus
 %--adyacentes
 generar_vecinos(Nodo):-
@@ -293,7 +291,7 @@ seleccionarA(Nodo):-
 %--si Prof no supera la cota máxima de profundidad
 buscarA([PosE|SSol],_Prof):-
 %--Este es el caso base, si no se detuvo la busqueda por un corte en la profundidad
-	continuar_busqueda,
+	%--continuar_busqueda,
 
 %--Se selecciona un nodo candidato
 	seleccionarA(Nodo),
@@ -313,7 +311,7 @@ buscarA([PosE|SSol],_Prof):-
 	
 buscarA(Sol,Prof):-
 %--Si la busqueda no se cortó por la cota máxima
-	continuar_busqueda,
+	%--continuar_busqueda,
 	
 %--Se determina cual esta cota máxima, y se controla
 %--que no se la esté pasando
@@ -333,7 +331,7 @@ buscarA(Sol,Prof):-
 %--Corta la busqueda
 buscarA(Sol,Prof):-
 %--Si la busqueda no se cortó por la cota máxima
-	continuar_busqueda,
+	%--continuar_busqueda,
 %--Obtengo que se superó la cota máxima
 	cota_prof(CotaP),
 	(Prof>CotaP;Prof=CotaP),

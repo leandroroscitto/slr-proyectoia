@@ -10,6 +10,9 @@
 %--max_num_landmark(-Num), indica la cantidad Num de landmarks en el estado interno
 :-dynamic max_num_landmark/1.
 
+%--cant_divisiones(-Div), cantidad de divisiones Div para generar landmarks
+cant_divisiones(4).
+
 %--proxima_landmark(-Pos), devuelve la posición Pos de una landmark, de acuerdo al turno actual
 proxima_landmark(Pos):-
 	turno_act(TurnAct),
@@ -78,9 +81,11 @@ generar_landmarks(Grilla,Num,MaxCF,MaxCC,CantF,CantC):-
 generar_landmarks(Grilla,Num,MaxCF,MaxCC,CantF,CantC):-
 	%--Caso en el que es necesario determinar una posición
 	CantF>0,
+	
+	cant_divisiones(CantD),
 
-	PosF is ((CantF*5)-2),
-	PosC is ((CantC*5)-2),
+	PosF is ((CantF*CantD)-2),
+	PosC is ((CantC*CantD)-2),
 	
 	%--A partir de una posición ideal (para que queden distribuidas de forma
 	%--uniforme) determina si es transitable, y si no lo es indica una posición
@@ -105,9 +110,11 @@ generar_landmarks(Grilla,Num,MaxCF,MaxCC,CantF,CantC):-
 	%--simplemente no la agrega, y sigue con la próxima posición
 	%--deseada.
 	CantF>0,
+	
+	cant_divisiones(CantD),
 
-	PosF is ((CantF*5)-2),
-	PosC is ((CantC*5)-2),
+	PosF is ((CantF*CantD)-2),
+	PosC is ((CantC*CantD)-2),
 	
 	not(pos_aprox_pasable(Grilla,[PosF,PosC],_PosAp)),
 	
@@ -141,8 +148,10 @@ act_metas_landmarks:-
 	maxFila(Grilla,MF),
 	maxCol(Grilla,MC),
 	
-	CantLandF is ceil(MF/5),
-	CantLandC is ceil(MC/5),
+	cant_divisiones(CantD),
+	
+	CantLandF is ceil(MF/CantD),
+	CantLandC is ceil(MC/CantD),
 	
 	generar_landmarks(Grilla,0,CantLandF,CantLandC,CantLandF,CantLandC),
 	
@@ -171,7 +180,6 @@ act_metas_landmarks:-
 	camino_meta(CMeta),
 	(CMeta\=[],CMeta\=[PosAct]),
 	write('Pero ya estoy en camino a un meta, mejor no hago ningún nuevo plan'),nl.
-	
 act_metas_landmarks:-
 	%--Si ya recorrió toda la grilla
 	porcentaje_grilla(Porc),
@@ -191,10 +199,10 @@ act_metas_landmarks:-
 	proxima_landmark(PosLM),
 	write('Mi próxima parada es ...'),write(PosLM),nl,
 	write('Voy a buscar el mejor camino'),nl,
-	%--Y busca un camino a ella, con una profundidad de 150,
+	%--Y busca un camino a ella, con una profundidad de 1500,
 	%--aunque para esta altura el agente ya conoce toda la 
 	%--grilla, asi que de existir un camino lo encontrará
-	empezar([PosAct,DirAct],[[PosLM,_DirLM]],SolR,150),
+	empezar([PosAct,DirAct],[[PosLM,_DirLM]],SolR,1500),
 	reverse(SolR,Sol),
 	%--De encontrar uno lo inidica como la próxima meta
 	write('Ya lo encontré, voy a seguirlo supongo...'),
@@ -216,9 +224,63 @@ act_metas_landmarks:-
 	write('Pero no había ninguna al final, o no encontré un camino a alguna de ellas'),nl.
 
 %--METAS DE SUPERVIVENCIA (DESCANSO, ATAQUE Y HUIDA)
-%--Si el agente considera que está demasiado cansado, busca refujio en el hostel conocido
-%--mas cercano.
+%--Determina si hay agentes enemigos cerca
 act_metas_supervivencia:-
+	pos_act(Pos),
+	dir_act(Dir),
+	turno_act(TurnAct),
+	
+	%--Busca agentes en todas las posiciones atacables (enfrente,
+	%--diagonal derecha e izquierda) en el turno actual. Se podría implementar que ataque
+	%--a alguno en particular de acuerdo a alguna condición,
+	%--por ahora elige un cualquiera
+	findall(
+		[Ag,PosAg],
+		(
+			estado_objetos(Objetos),
+			member(Obj,Objetos),
+			Obj=[PosAg,Ag,TurnAct],
+			Ag=[agent,_,_],
+			(
+				ady_at_cardinal(Pos,Dir,PosAg);
+				diagd_at_cardinal(Pos,Dir,PosAg);
+				diagi_at_cardinal(Pos,Dir,PosAg)
+			)
+		),
+		Agentes
+	),
+	
+	(
+		(
+			%--Si encontró agentes cercanos
+			Agentes\=[],
+			
+			%--Indica que hay peligro, exiten agentes en posición atacable
+			%--(posiblemente ellos pueden atacar también)
+			retractall(peligro_agente),
+			assert(peligro_agente),
+			retractall(agentes_cerca(_)),
+			assert(agentes_cerca(Agentes))
+		);
+		(
+			%--Si no encontró agentes cercanos, lo indica
+			Agentes=[],
+			retractall(peligro_agente),
+			retractall(agentes_cerca(_)),
+			%--Y falla, para determinar otras metas
+			fail
+		)
+	),
+	
+	write('Hay agentes demasiado cerca, '),write(Agentes),
+	write(', tendré que ver que hago'),
+	
+	%--Debe estar en condiciones de pelear, en otro caso debe
+	%--buscar refujio
+	estoy_condiciones_pelear.
+act_metas_supervivencia:-
+	%--Si el agente considera que está demasiado cansado, busca refujio 
+	%--en el hostel conocido mas cercano.
 	write('Estoy suficientemente cansado para buscar refujio? '),
 	
 	%--Si ya esta en camino a un hostel, posiblemente este cansado, asi que
@@ -228,23 +290,35 @@ act_metas_supervivencia:-
 	
 	nl,write('Debo estarlo, ya estoy en camino a un hostel'),nl.
 act_metas_supervivencia:-
-	%--A partir de la stamina actual del agente, y el tamaña de la grilla conocida,
-	%--determina que debe buscar refujio si su stamina actual es menor que 3/4
-	%--de la altura más lo ancho de la grilla conocida.
-	%--Se podría haber utilizado la busqueda A* para encontrar el hoste más
-	%--cercano y determinar si el costo de llegar a el no supera la stamina
-	%--actual, pero el costo de realizar esta consulta sería demasiado
-	%--considerando que debe realizar mas cosas en el turno.
-	sta_act(StaAg),
-	
-	estado_grilla(Grilla),
-	maxFila(Grilla,MF),
-	maxCol(Grilla,MC),
-	Dist is MF+MC,
-	Dist34 is (Dist*3/4),
-
-	LMSta is Dist34,
-	StaAg<LMSta,
+	%--Busca refujio si está muy cansado, o está en peligro y no está en condiciones
+	%--de pelear.
+	(
+		(
+			%--A partir de la stamina actual del agente, y el tamaña de la grilla conocida,
+			%--determina que debe buscar refujio si su stamina actual es menor que 3/4
+			%--de la altura más lo ancho de la grilla conocida.
+			%--Se podría haber utilizado la busqueda A* para encontrar el hoste más
+			%--cercano y determinar si el costo de llegar a el no supera la stamina
+			%--actual, pero el costo de realizar esta consulta sería demasiado
+			%--considerando que debe realizar mas cosas en el turno.
+			sta_act(StaAg),
+			
+			estado_grilla(Grilla),
+			maxFila(Grilla,MF),
+			maxCol(Grilla,MC),
+			Dist is MF+MC,
+			Dist34 is (Dist*3/4),
+		
+			LMSta is Dist34,
+			StaAg<LMSta
+		);
+		(
+			%--Si está en peligro y no en condiciones de pelear,
+			%--busca refujio
+			peligro_agente,
+			not(estoy_condiciones_pelear)
+		)
+	),
 	
 	nl,write('Si, estoy algo cansado y voy buscar refujio...'),nl,
 	
@@ -449,13 +523,7 @@ act_metas_exploracion:-
 %--METAS GENERALES
 %--Si la acción previa fue avanzar, y la posición no cambio,
 %--supone que está en la situación del hostel bloqueado, (u otra razón
-%--no permite atravezar la posición), e intenta buscar un camino por un costado
-act_metas_bloqueadas:-
-	%--En el caso de que este tratando de llegar a un hostel y este no me
-	%--deja pasar, no tengo opción, tengo que esperar
-	tipo_meta(hostel),
-	fail. %--VER
-	
+%--no permite atravezar la posición), e intenta buscar un camino por un costado	
 act_metas_bloqueadas:-
 	pos_act(PosAct),
 	dir_act(DirAct),
@@ -464,6 +532,11 @@ act_metas_bloqueadas:-
 	
 	AccPrev=move_fwd,
 	PosAct=PosPrev,
+	
+	%--Intenta buscar otro camino en el caso de que NO esté llendo a un hostel
+	%--En el caso de que este tratando de llegar a un hostel y este no me
+	%--deja pasar, no tengo opción, tengo que esperar
+	not(tipo_meta(hostel)),
 	
 	write('Me estoy dando la cabeza contra una pared y no puedo pasar...'),nl,
 	write('Voy a intentar pasar por un costado'),nl,
@@ -474,7 +547,16 @@ act_metas_bloqueadas:-
 	
 	%--Busca un nuevo camino por un costado
 	meta_act(MetaPos),
-	empezar([PosAct,DirAct],[[MetaPos,_MetaDir]],SolR,80),
+	tipo_meta(TMeta),
+	(
+		%--La cota máxima para la busqueda depende del tipo
+		%--de la meta
+		(TMeta=unknown,CotaM=60);
+		(TMeta=landmark,CotaM=1500);
+		(TMeta=treasure,CotaM=40)
+	),
+	
+	empezar([PosAct,DirAct],[[MetaPos,_MetaDir]],SolR,CotaM),
 	(
 		(
 			(SolR=null;SolR=[]),

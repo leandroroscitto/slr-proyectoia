@@ -62,7 +62,9 @@ act_metas:-
 		act_metas_exploracion;
 		%--Cuando ya exploró toda la grilla, trata de recorrerla de forma ordenada
 		%--para encontrar nuevas cosas (agentes, o tesoros caidos)
-		act_metas_landmarks
+		act_metas_landmarks;
+		%--Evita que falle si todo lo demas falla
+		true
 	).
 
 %-- CICLO======================================================================

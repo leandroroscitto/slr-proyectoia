@@ -53,6 +53,8 @@
 :-dynamic esperar/1.
 %--peligro_agente determina si exiten agentes enemigos en las cercanias
 :-dynamic peligro_agente/0.
+%--agentes_cerca(-ListA), ListA es una lista de agentes que se encuentra en posiciones atacables
+:-dynamic agentes_cerca/1.
 
 %--ag_name(Nombre), representa el Nombre del agente
 :-dynamic ag_name/1.

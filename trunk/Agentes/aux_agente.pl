@@ -43,7 +43,8 @@ get_mstamina_attr(Attr,MStaAct):-
 %--agente a partir de sus atributos
 get_fightskill_attr(Attr,FSAct):-
 	member([fight_skill,FSAct],Attr).
-	%--diagd_at_cardinal(+Pos,+Dir,-Posdiagd), devuelve la posición diagonal 
+
+%--diagd_at_cardinal(+Pos,+Dir,-Posdiagd), devuelve la posición diagonal 
 %--derecha a partir de la dirección
 diagd_at_cardinal([F,C],n,[PredF,SuccC]):-next(PredF,F),next(C,SuccC).
 diagd_at_cardinal([F,C],s,[SuccF,PredC]):-next(F,SuccF),next(PredC,C).

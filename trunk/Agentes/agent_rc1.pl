@@ -28,12 +28,18 @@
 %--ACTUALIZACION DEL ESTADO INTERNO
 %--Actualiza la representación interna del entorno y los atributos del agente
 act_estado(Perc):-
+	%--Actualiza la representación interna del entorno que lleva el agente,
+	%--por medio de la nueva percepción
 	act_estado_ent(Perc),
+	%--Actualiza los atributos internos del agente, a partir de lo percibido
 	act_estado_ag(Perc).
 
 %--SELECCION==================================================================
 %--La selección del acción depende de las prioridades del agente
 sel_accion(Action):-
+	%--Por prioridad, primero selecciona una acción que asegure su supervivencia,
+	%--si no es necesaria ninuna se consentra en los tesoros, y en último lugar
+	%--busca completar alguna meta seteada previamente
 	sel_accion_supervivencia(Action);
 	sel_accion_tesoros(Action);
 	sel_accion_metas(Action);
@@ -42,11 +48,22 @@ sel_accion(Action):-
 %--ACTUALIZAR LAS METAS DEL AGENTE============================================
 %--Actualización de metas de acuerdo con las prioridades del agente
 act_metas:-
-	act_metas_bloqueadas;
-	act_metas_supervivencia;
-	act_metas_tesoros;
-	act_metas_exploracion;
-	act_metas_generales.
+	act_metas_generales,
+	(
+		%--Primero verifica que no esté tratando de cruzar una posición
+		%--temporalmente impasable
+		act_metas_bloqueadas;
+		%--Si no es el caso, busca ante todo sobrevivir (buscar refujio,
+		%--escapar de enemigos o atacar si fuera necesario)
+		act_metas_supervivencia;
+		%--En el caso de que no requiera nada de lo anterior, busca tesoros
+		act_metas_tesoros;
+		%--Si no hay tesoros alcanzables, busca explorar las celdas no vistas
+		act_metas_exploracion;
+		%--Cuando ya exploró toda la grilla, trata de recorrerla de forma ordenada
+		%--para encontrar nuevas cosas (agentes, o tesoros caidos)
+		act_metas_landmarks
+	).
 
 %-- CICLO======================================================================
 run:-

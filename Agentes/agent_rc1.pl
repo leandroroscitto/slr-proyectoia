@@ -60,6 +60,9 @@ act_metas:-
 		act_metas_tesoros;
 		%--Si no hay tesoros alcanzables, busca explorar las celdas no vistas
 		act_metas_exploracion;
+		%--Si además de no haber tesoros,no hay nuevos lugares que explorar busca
+		%--otro agente para atacar y robarle 
+		act_metas_ofensiva;
 		%--Cuando ya exploró toda la grilla, trata de recorrerla de forma ordenada
 		%--para encontrar nuevas cosas (agentes, o tesoros caidos)
 		act_metas_landmarks;

@@ -42,11 +42,10 @@ seguir_camino(Accion):-
 walkabout_accion(Action):-
 	pos_act(Pos),
 	
-	objetos_en_pos(Pos,Objetos),
+	objetos_en_pos(Pos,treasure,Objetos),
 	
 	member(Obj,Objetos),
-	Obj=[Tipo,Nombre,_Descrip],
-	Tipo=treasure,
+	Obj=[treasure,Nombre,_Descrip],
 	
 	Action=pickup(Nombre).
 	
@@ -161,16 +160,34 @@ sel_accion_supervivencia(Action):-
 	%--Verifica que este en condiciones de pelear
 	estoy_condiciones_pelear,
 	
-	%--Elige un agente cercano al azar
+	%--Elige un agente cercano al azar, que no estea inconciente
 	agentes_cerca(Agentes),
 	member(Agente,Agentes),
-	Agente=[[_,Nombre,_],Pos],
-	
-	write('Vi al agente '),write(Nombre),
-	write(' en la posición '),write(Pos),
-	write(', lo voy a atacar'),nl,
-	
-	Action=attack(Nombre).
+	Agente=[[_,Nombre,_Desc],Pos],
+	%--Verifica que el agente no está en un hostel
+	objetos_en_pos(Pos,hostel,Hosteles),
+	(
+		(
+			%--No hay hosteles (debería haber solo uno en todo caso)
+			Hosteles=[],
+			
+			write('Vi al agente '),write(Nombre),
+			write(' en la posición '),write(Pos),
+			write(', lo voy a atacar'),nl,
+			
+			%--Ataca al agente
+			Action=attack(Nombre)
+		);
+		(
+			%--El agente está en un hostel, no lo puede atacar
+			Hosteles\=[],
+			
+			write('El cobarde de '),write(Nombre),
+			write(' se esconde en un hostel'),nl,
+			
+			fail
+		)
+	).
 %--sel_accion_supervivencia(+Action), si no esta a full de stamina, se queda esperando en un hostel
 sel_accion_supervivencia(Action):-
 	sta_act(Sta),
@@ -179,11 +196,10 @@ sel_accion_supervivencia(Action):-
 	
 	pos_act(Pos),
 	
-	objetos_en_pos(Pos,Objetos),
+	objetos_en_pos(Pos,hostel,Objetos),
 	
 	member(Obj,Objetos),
-	Obj=[Tipo,Nombre,_Descrip],
-	Tipo=hostel,
+	Obj=[hostel,Nombre,_Descrip],
 	
 	write('No estoy a full de stamina, voy a descanzar en el hostel '),
 	write(Nombre),nl,
@@ -200,16 +216,70 @@ sel_accion_supervivencia(Action):-
 sel_accion_tesoros(Action):-
 	pos_act(Pos),
 	
-	objetos_en_pos(Pos,Objetos),
+	objetos_en_pos(Pos,_Tipo,Objetos),
+	write('Objetos en la posición: '),write(Pos),write(', '),
+	write(Objetos),nl,
 	
 	member(Obj,Objetos),
 	Obj=[Tipo,Nombre,_Descrip],
 	Tipo=treasure,
 	
-	write('Esta el tesoro '),write(Nombre),
-	write(' en esta posición, voy intentar levantarlo'),nl,
-	
-	Action=pickup(Nombre).
+	%--Busca que no halla ningún agente en la misma posición
+	%--que esté conciente, de manera que se satisfaga la
+	%--precondición del pickup
+	findall(
+		Nombre2,
+		(
+			member(Obj2,Objetos),
+			Obj2=[Tipo2,Nombre2,Desc],
+			Tipo2=agent,
+			member([unconscious,false],Desc)
+		),
+		Agentes
+	),
+	write('Agentes: '),write(Agentes),nl,
+	(
+		(	
+			%--No hay ningún agente, puedo levantarlo
+			Agentes=[],
+			
+			write('Esta el tesoro '),write(Nombre),
+			write(' en esta posición, voy intentar levantarlo'),nl,
+			
+			Action=pickup(Nombre)
+		);
+		(
+			%--Hay otro agentes en la misma posición
+			Agentes\=[],
+			
+			%--Lo ataca
+			member(NAgente,Agentes),
+			Action=attack(NAgente)
+			
+			/*
+			Opcion de escapar, no funciona demasiado bien
+			write('Hay otros agentes, en esta misma posición,'),
+			write(' mejor me voy'),
+			
+			%--Busca regresar por donde venia
+			dir_act(Dir),write('Direccion actual'),write(Dir),nl,
+			dir_opuesta(Dir,DirO),write('Direccion opuesta'),write(DirO),nl,
+			ady_at_cardinal(Pos,DirO,PosP),write('Posicion meta'),write(PosP),nl,
+			write(' a la posición '),write(PosP),nl,
+
+			
+			%--Y sigue el camino a la posición continua
+			retractall(meta_act(_)),
+			assert(meta_act(PosP)),
+			retractall(tipo_meta(_)),
+			assert(tipo_meta(moverse)),
+			
+			retractall(camino_meta(_)),
+			assert(camino_meta([PosP])),
+			seguir_camino(Action)
+			*/
+		)
+	).
 
 %--sel_accion_metas(+Action), si no necesita realizar ninguna acción mas prioritaria, sigue por el camino
 %--a una meta

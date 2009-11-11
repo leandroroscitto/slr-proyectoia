@@ -248,12 +248,13 @@ generar_vecinos(Nodo):-
 					%--Se actualizan todos los costos y caminos de
 					%--los nodos que tengan un camino a través de 
 					%--NodoV
-					Diff is (NodoVG-GNV),
-					actualizar_ramas_por(NodoV,C,Diff),
+					
+					%--Diff is (NodoVG-GNV),
+					%--actualizar_ramas_por(NodoV,C,Diff),
 					
 					retract(cerrado([NodoV,_,_,NodoVG])),
-					%--assert(abierto([NodoV,NodoVH,[PosE|C],GNV])) VER
-					assert(cerrado([NodoV,NodoVH,[PosE|C],GNV]))
+					assert(abierto([NodoV,NodoVH,[PosE|C],GNV]))
+					%--assert(cerrado([NodoV,NodoVH,[PosE|C],GNV]))
 				);
 				(
 					(

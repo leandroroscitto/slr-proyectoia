@@ -25,6 +25,10 @@
 :-dynamic inv_act/1.
 %--Habilidad de pelea actual del agente
 :-dynamic fs_act/1.
+%--Lista de nombres de agentes que lo atacaron
+:-dynamic atacantes/1.
+%--Lista de nombres de agentes que lo hirieron
+:-dynamic hirieron/1.
 
 %--accion_previa(-Accion), Accion realizada en el turno anterior al actual
 :-dynamic accion_previa/1.

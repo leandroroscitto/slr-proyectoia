@@ -15,6 +15,8 @@ msta_act(-1).
 dir_act(-1).
 inv_act([]).
 fs_act(-1).
+atacantes([]).
+hirieron([]).
 
 accion_previa(-1).
 pos_previa([-1,-1]).

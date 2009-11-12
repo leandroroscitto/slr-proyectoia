@@ -190,7 +190,7 @@ procesar_vis(Vis,TurAct,VObjetos):-
 		[Pos,Cosa,TurAct],
 		(
 			member(Item,Vis),
-			Item=[Pos,_,Cosas],
+			Item=[Pos,_Land,Cosas],
 			member(Cosa,Cosas)
 		),
 		VObjetos

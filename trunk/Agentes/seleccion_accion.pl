@@ -152,7 +152,32 @@ walkabout_accion(Action):-
 	%--No es transitable, gira a la derecha
 	Action=turn(DirDer).
 
-%--sel_accion_supervivencia(+Action), si hay un agente alcanzable y él está en condiciones de pelear, lo ataca
+%--sel_accion_supervivencia(+Action), si es atacado y no tiene agentes alcanzable,
+%--gira para encontrar a su agresor
+sel_accion_supervivencia(Action):-
+	%--Hay agentes atacandole
+	atacantes(AgentesHost),
+	AgentesHost\=[],
+	
+	%--Y está en condiciones de pelear
+	estoy_condiciones_pelear,
+	%--Si no está en condiciones de pelear
+	%--se supone que no se quedará parado
+	%--a menos que esté en un hostel,
+	%--en cuyo caso se queda hasta recuperar
+	%--stamina
+	
+	%--Pero él no los tiene al alcanze
+	agentes_cerca(AgentesAtacables),
+	AgentesAtacables=[],
+	%--Si los tiene al alcanze, falla y se analiza la próxima
+	%--situación y determina si los atacará
+	
+	%--Entonces girar 90 grados para ver si ve el agresor
+	dir_act(Dir),
+	next_90_clockwise(Dir,DirR),
+	Action=turn(DirR).
+%--sel_accion_supervivencia(+Action), si hay un agente alcanzable y este agente está en condiciones de pelear, lo ataca
 sel_accion_supervivencia(Action):-
 	%--Hay agentes cerca?
 	peligro_agente,
@@ -291,7 +316,7 @@ sel_accion_metas(Action):-
 %--sel_accion_exploracion(+Action), si no hay camino a seguir, camina al azar
 sel_accion_exploracion(Action):-
 	write('No, mejor voy a explorar un toque a ver que hay'),nl,
-	seguir_camino(Action),!.
+	seguir_camino(Action).
 sel_accion_exploracion(Action):-
 	camino_meta(Camino),
 	Camino=[],

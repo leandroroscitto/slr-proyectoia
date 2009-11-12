@@ -63,9 +63,11 @@ act_estado_visita(Pos):-
 %--de la visión de la percepción actual
 act_estado_objetos(Vis,TurAct):-
 	%--Obtiene la lista de objetos observados en la percepción
-	procesar_vis(Vis,TurAct,VObjetos),
+	procesar_vis(Vis,TurAct,VObjetos),write(Vis),nl,
 	%--Obtiene la representación interna de los objetos percibidos por el agente
 	estado_objetos(EIObjetos),
+	
+	write(VObjetos),nl,
 	
 	%--Extrae los objetos de la visión que no se encuentran en el estado interno,
 	%--no importa la posición
@@ -93,7 +95,7 @@ act_estado_objetos(Vis,TurAct):-
 			%--not(member([_,Cosa,_],EIObjetos))
 		),
 		NObjetosNoRep
-	),
+	),write('Objetos no repetidos: '),write(NObjetosNoRep),nl,
 	%--Extrae los objetos de la visión que se encuentran en el estado interno
 	%--en la misma posición y me quedo con el último turno conocido (Turno actual)
 	findall(
@@ -109,17 +111,17 @@ act_estado_objetos(Vis,TurAct):-
 			(
 				(
 					Tipo=agent,
-					member([Pos,[agent,Nombre,_],_],EIObjetos)
+					member([_Pos,[agent,Nombre,_],_],EIObjetos)
 				);
 				(
 					Tipo\=agent,
-					member([Pos,Cosa,_],EIObjetos)
+					member([_Pos,Cosa,_],EIObjetos)
 				)
 			)
 			%--member([Pos,Cosa,_],EIObjetos)
 		),
 		NObjetosRep
-	),
+	),write('Objetos repetidos: '),write(NObjetosRep),nl,
 	%--Extrae los objetos del estado interno que no contradicen la visualización,
 	%--es decir no aparecen en la visualización y no deberían encontrarse según el
 	%--rango de visión
@@ -147,7 +149,7 @@ act_estado_objetos(Vis,TurAct):-
 			not(member([Pos,_,_],Vis))
 		),
 		NObjetosDif
-	),
+	),write('Objetos diferentes: '),write(NObjetosDif),nl,
 	
 	%--La nueva representación de los objetos percibidos es la unión de los
 	%--tres conjuntos construidos
@@ -187,7 +189,7 @@ act_estado_ent(Perc):-
 
 %--act_estado_ag(+Perc), actualiza el estado interno de los atribtutos del agente
 act_estado_ag(Perc):-
-	Perc=[_Tur,_Vis,Att,Inv],
+	Perc=[_Tur,Vis,Att,Inv],
 	
 	%--Actualiza la posición del agente
 	get_pos_attr(Att,Pos),
@@ -211,4 +213,19 @@ act_estado_ag(Perc):-
 	
 	%--Actualiza el inventario actual del agente
 	retractall(inv_act(_)),
-	assert(inv_act(Inv)).
+	assert(inv_act(Inv)),
+	
+	%--Determina si el agente fue atacado o herido
+	ag_name(Nombre),
+	
+	member([_Pos,_Land,Cosas],Vis),
+	member([agent,Nombre,Desc],Cosas),
+
+	%--De no existir alguna de las listas devuelve vacio
+	(member([attacked_by,Atacantes],Desc);Atacantes=[]),
+	(member([harmed_by,Hirieron],Desc);Hirieron=[]),
+
+	retractall(atacantes(_)),
+	assert(atacantes(Atacantes)),
+	retractall(hirieron(_)),
+	assert(hirieron(Hirieron)).

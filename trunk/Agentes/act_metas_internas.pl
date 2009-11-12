@@ -244,14 +244,13 @@ act_metas_ofensiva:-
 			member(Obj,Objetos),
 			Obj=[PosAg,Ag,_Turno],
 			Ag=[agent,_,Desc],
-			write(Desc),
 			member([dir,Dir],Desc),
 			%--Deja en paz a los desmayados, pero se podría cambiar
 			member([unconscious,false],Desc)
 		),
 		Agentes
 	),
-	
+	write(Agentes),
 	%--En realidad debería encontrar los agentes mas cercanos que fueron
 	%--vistos hace poco, pero de no existir buscará de acuerdo a lo que
 	%--recuerda la última posición conocida de una agente
@@ -562,7 +561,7 @@ act_metas_exploracion:-
 	%--Dado que muchas veces la celda puede estar en el otro extremo
 	%--de la grilla, se le permite una cota de profundadid mas
 	%--grande
-	empezar([PosAg,DirAg],Inexplorados,SolR,60),
+	empezar([PosAg,DirAg],Inexplorados,SolR,1500),
 	reverse(SolR,Sol),
 	
 	write('Si puedo llegar, ya me pongo en marcha, creo...'),nl,

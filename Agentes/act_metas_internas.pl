@@ -676,8 +676,8 @@ act_metas_generales:-
 	Staplus is Sta+5,
 	(Staplus=MSta;Staplus>MSta),
 	
-	%-Resetea las metas
-	retracall(camino_meta(VMeta)),
+	%--Resetea las metas
+	retractall(camino_meta(VMeta)),
 	assert(camino_meta([])),
 	retractall(meta_act(_)),
 	assert(meta_act(null)),

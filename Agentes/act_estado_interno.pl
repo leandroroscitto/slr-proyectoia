@@ -48,26 +48,14 @@ act_estado_grilla(Vis,PosAct):-
 	retractall(estado_grilla(Grilla)),
 	assert(estado_grilla(NGrillaV)).
 
-%--VER: Actualizar solo los visitados una vez que toda la grilla fue descubierta
-%--act_estado_visita(+Pos), actualiza la grilla determinando la posición
-%--que fue visitada
-act_estado_visita(Pos):-
-	estado_grilla(Grilla),
-	member([Pos,Land,Vist],Grilla),
-	reemplazar([Pos,Land,1],[Pos,Land,Vist],Grilla,NGrilla),
-	retractall(estado_grilla(Grilla)),
-	assert(estado_grilla(NGrilla)).
-
 %--act_estado_objetos(+TurAct,+Vis), actualiza la representación interna
 %--de los objetos del entorno, agregando o modificando los objetos a partir
 %--de la visión de la percepción actual
 act_estado_objetos(Vis,TurAct):-
 	%--Obtiene la lista de objetos observados en la percepción
-	procesar_vis(Vis,TurAct,VObjetos),write(Vis),nl,
+	procesar_vis(Vis,TurAct,VObjetos),
 	%--Obtiene la representación interna de los objetos percibidos por el agente
 	estado_objetos(EIObjetos),
-	
-	write(VObjetos),nl,
 	
 	%--Extrae los objetos de la visión que no se encuentran en el estado interno,
 	%--no importa la posición
@@ -95,7 +83,7 @@ act_estado_objetos(Vis,TurAct):-
 			%--not(member([_,Cosa,_],EIObjetos))
 		),
 		NObjetosNoRep
-	),write('Objetos no repetidos: '),write(NObjetosNoRep),nl,
+	),
 	%--Extrae los objetos de la visión que se encuentran en el estado interno
 	%--en la misma posición y me quedo con el último turno conocido (Turno actual)
 	findall(
@@ -109,19 +97,20 @@ act_estado_objetos(Vis,TurAct):-
 			%--ya que en ese caso su descripción puede variar
 			Cosa=[Tipo,Nombre,_],
 			(
+				%--VER: Verificar que el cambio no produjo errores
 				(
 					Tipo=agent,
-					member([_Pos,[agent,Nombre,_],_],EIObjetos)
+					member([_,[agent,Nombre,_],_],EIObjetos) 
 				);
 				(
 					Tipo\=agent,
-					member([_Pos,Cosa,_],EIObjetos)
+					member([_,Cosa,_],EIObjetos)
 				)
 			)
 			%--member([Pos,Cosa,_],EIObjetos)
 		),
 		NObjetosRep
-	),write('Objetos repetidos: '),write(NObjetosRep),nl,
+	),
 	%--Extrae los objetos del estado interno que no contradicen la visualización,
 	%--es decir no aparecen en la visualización y no deberían encontrarse según el
 	%--rango de visión
@@ -149,7 +138,7 @@ act_estado_objetos(Vis,TurAct):-
 			not(member([Pos,_,_],Vis))
 		),
 		NObjetosDif
-	),write('Objetos diferentes: '),write(NObjetosDif),nl,
+	),
 	
 	%--La nueva representación de los objetos percibidos es la unión de los
 	%--tres conjuntos construidos

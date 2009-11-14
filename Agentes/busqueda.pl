@@ -153,11 +153,11 @@ adyacente(PosDir,PosDirV,P):-
 	%--El costo total es la suma de las dos consideraciones
 	P is P1+P2.
 
-%--============================================================================
 %--actualizar_ramas_por(+NodoE,+NuevoC,+DifCosto), actualiza el camino NuevoC y el
 %--costo (ajustando la diferencia DifCosto) de las ramas del árbol de busqueda,
 %--en los casos de que se encuentre un mejor camino para una celda NodoE ya
 %--expandida y cerrada
+%--NO USUADO
 actualizar_ramas_por(NodoE,NuevoC,DifCosto):-
 	NodoE=[PosE,_DirE],
 	forall(
@@ -338,8 +338,6 @@ buscarA(Sol,Prof):-
 
 %--La mejor opcion es devolver un valor nulo, asi evita el backtracking
 	Sol=null,
-	
-	write('Corté la busqueda...'),nl,
 
 %--Evita que se siga busando una solución
 	retractall(continuar_busqueda).

@@ -39,7 +39,7 @@ seguir_camino(Accion):-
 
 %-- CAMINATA POR EL BORDE DERECHO==============================================
 %--Si hay tesoro en el piso lo lenvanta
-walkabout_accion(Action):-
+caminata_azar(Action):-
 	pos_act(Pos),
 	
 	objetos_en_pos(Pos,treasure,Objetos),
@@ -47,10 +47,9 @@ walkabout_accion(Action):-
 	member(Obj,Objetos),
 	Obj=[treasure,Nombre,_Descrip],
 	
-	Action=pickup(Nombre).
-	
+	Action=pickup(Nombre).	
 %--Avanza si es posible o si todabia no lo visito
-walkabout_accion(Action):-
+caminata_azar(Action):-
 	%--Obtiene posicion de la celda de enfrente
 	pos_act(Pos),
 	dir_act(Dir),
@@ -65,9 +64,8 @@ walkabout_accion(Action):-
 	
 	%--Si es transitable avanza
 	Action=move_fwd.
-
 %--Si no fue posible avanzar dobla a la izquierda
-walkabout_accion(Action):-
+caminata_azar(Action):-
 	%--Obtiene posicion de la celda de la izquierda
 	pos_act(Pos),
 	dir_act(Dir),
@@ -83,9 +81,8 @@ walkabout_accion(Action):-
 	
 	%--No es transitable, gira a la izquierda
 	Action=turn(DirIzq).
-
 %--Si no fue posible doblar a la izquierda, dobla a la derecha
-walkabout_accion(Action):-
+caminata_azar(Action):-
 	%--Obtiene posicion de la celda de la derecha
 	pos_act(Pos),
 	dir_act(Dir),
@@ -101,9 +98,8 @@ walkabout_accion(Action):-
 	
 	%--No es transitable, gira a la derecha
 	Action=turn(DirDer).
-
 %--Avanza si es posible
-walkabout_accion(Action):-
+caminata_azar(Action):-
 	%--Obtiene posicion de la celda de enfrente
 	pos_act(Pos),
 	dir_act(Dir),
@@ -117,9 +113,8 @@ walkabout_accion(Action):-
 	
 	%--Si es transitable avanza
 	Action=move_fwd.
-
 %--Si no fue posible avanzar dobla a la izquierda
-walkabout_accion(Action):-
+caminata_azar(Action):-
 	%--Obtiene posicion de la celda de la izquierda
 	pos_act(Pos),
 	dir_act(Dir),
@@ -134,9 +129,8 @@ walkabout_accion(Action):-
 	
 	%--No es transitable, gira a la izquierda
 	Action=turn(DirIzq).
-
 %--Si no fue posible doblar a la izquierda, dobla a la derecha
-walkabout_accion(Action):-
+caminata_azar(Action):-
 	%--Obtiene posicion de la celda de la derecha
 	pos_act(Pos),
 	dir_act(Dir),
@@ -150,6 +144,13 @@ walkabout_accion(Action):-
 	celda_libre(PosDir,0),
 	
 	%--No es transitable, gira a la derecha
+	Action=turn(DirDer).
+%--Si todo lo demás falla, girar en sentido horario,
+%--en el peor de los casos el agente se cansa e intenta
+%--buscar refujio
+caminata_azar(Action):-
+	dir_act(Dir),
+	next_90_clockwise(Dir,DirDer),
 	Action=turn(DirDer).
 
 %--sel_accion_supervivencia(+Action), si es atacado y no tiene agentes alcanzable,
@@ -173,9 +174,10 @@ sel_accion_supervivencia(Action):-
 	%--Si los tiene al alcanze, falla y se analiza la próxima
 	%--situación y determina si los atacará
 	
-	%--Entonces girar 90 grados para ver si ve el agresor
+	%--Entonces girar 180 grados para ver si ve el agresor
 	dir_act(Dir),
-	next_90_clockwise(Dir,DirR),
+	next_90_clockwise(Dir,DirR1),
+	next_90_clockwise(DirR1,DirR),
 	Action=turn(DirR).
 %--sel_accion_supervivencia(+Action), si hay un agente alcanzable y este agente está en condiciones de pelear, lo ataca
 sel_accion_supervivencia(Action):-
@@ -274,6 +276,10 @@ sel_accion_tesoros(Action):-
 			Action=pickup(Nombre)
 		);
 		(
+			%--Esta posibilidad probablemente nunca se de, de existir un 
+			%--agente en la misma posición será capturado por la selección
+			%--de supervivencia anterior
+			
 			%--Hay otro agentes en la misma posición
 			Agentes\=[],
 			
@@ -315,15 +321,11 @@ sel_accion_metas(Action):-
 
 %--sel_accion_exploracion(+Action), si no hay camino a seguir, camina al azar
 sel_accion_exploracion(Action):-
-	write('No, mejor voy a explorar un toque a ver que hay'),nl,
-	seguir_camino(Action).
-sel_accion_exploracion(Action):-
 	camino_meta(Camino),
 	Camino=[],
 	write('No hay ninguna meta, me pongo a caminar'),nl,
-	walkabout_accion(Action).
-
+	caminata_azar(Action).
 %--sel_accion_exploracion(+Action), no hay camino a seguir, no hay celdas inexploradas, y no tiene nada que hacer
 %--Nunca debería ocurrir VER
 sel_accion_exploracion(null_action):-
-	write('Look at you, hacker. A pathetic creature of meat and bone, panting and sweating as you run through my corridors. How can you challenge a perfect, immortal machine?'),nl.
+	write('No hago nada, nose que pasó'),nl.

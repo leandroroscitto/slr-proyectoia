@@ -1,6 +1,10 @@
 %--FUNCIONES AUXILIARES PARA EL AGENTE
 %--Supone que se consulta desde el agente.pl
 
+%--PRINCIPALMENTE EN ESTE MÓDULO PUEDEN EXISTIR PREDICADOS
+%--QUE SE USARON PARA AGUNA FUNCIÓN PERO QUE YA NO SON USADOS 
+%--EN LA VERSIÓN FINAL DEL AGENTE
+
 %--Determina si una cosa es un tesoro
 es_tesoro([treasure,_,_]).
 
@@ -59,6 +63,7 @@ diagi_at_cardinal([F,C],w,[PredF,PredC]):-next(PredF,F),next(PredC,C).
 	
 %--puede_pasar_hostel(+TurnoFut), determina si es posible trasladarse a través
 %--de un hostel en un turno futuro
+%--NO USADA
 puede_pasar_hostel(TurnoFut):-
 	ultimo_descanso(UTurno),!,
 	turno_act(TurnoAct),
@@ -82,6 +87,7 @@ puede_pasar_hostel(_TurnoFut):-
 
 %--celda_libre(+Pos,+TurnoFut), determina si una celda de la grilla esta o estará
 %--libre en un turno futuro
+%--NO USADA
 celda_libre(Pos,TurnoFut):-
 	estado_grilla(Grilla),
 	member([Pos,Land,_],Grilla),
@@ -221,7 +227,7 @@ ir_a_pos_ady(PosDest,Accion):-
 
 %--quemar_energia(-Action), determina la acción para quemera energia sin 
 %--moverse del lugar, si la cantidad de turnos es mayor que 0
-%--VER:SIRVE?
+%--NO USADA
 quemar_energia(Action):-
 	esperar(CantTurn);
 	CantTurn>0;
@@ -230,6 +236,7 @@ quemar_energia(Action):-
 	Action=turn(DirOp).
 
 %--adyacente(+Pos,-PosV), obtiene las celdas continuas de la celda Pos
+%--NO USADA
 adyacente(Pos,PosV):-
 	dir_posible(Dir),
 	ady_at_cardinal(Pos,Dir,PosV).

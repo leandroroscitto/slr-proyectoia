@@ -44,6 +44,7 @@
 %--tipo_meta(Tipo), Tipo pertenece {treasure,hostel,unknown}, indica el tipo
 %--de meta que indica la posición
 :-dynamic tipo_meta/1.
+
 %--no_transitable(-Pos) determina que la posición Pos no es transitable por alguna razón
 %--probablemente solo temporalmente
 :-dynamic no_transitable/1.

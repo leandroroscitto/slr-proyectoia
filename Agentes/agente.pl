@@ -72,7 +72,6 @@
 :-dynamic nuevos_tesoros/0.
 %--Representa el descubrimiento de nuevas celdas de la grilla
 :-dynamic nuevas_celdas/0.
-%--VER: Nuevos agentes(?)
 
 %--esperar(Turnos), Turnos es la cantidad de turnos dedicados a realizar alguna acción especial
 :-dynamic esperar/1.

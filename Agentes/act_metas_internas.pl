@@ -1,24 +1,39 @@
 %--METAS DEL AGENTE
 %--Supone que se consulta desde el agente.pl
 
-:-consult(busqueda).
-
 %--Determina si fueron generadas las landmarks de la grilla a utilizar
 :-dynamic land_generadas/0.
 %--landmark(-Pos,-Num), indica si una posición Pos es una landmark, y que número Num tiene asociado
 :-dynamic landmark/2.
 %--max_num_landmark(-Num), indica la cantidad Num de landmarks en el estado interno
 :-dynamic max_num_landmark/1.
+%--prox_landmark(-Num), Num es la identificación de la próxima landmark
+:-dynamic prox_landmark/1.
 
 %--cant_divisiones(-Div), cantidad de divisiones Div para generar landmarks
 cant_divisiones(4).
 
-%--proxima_landmark(-Pos), devuelve la posición Pos de una landmark, de acuerdo al turno actual
+%--esperar_desbloq(-Pos,-T), indica que se considerará bloqueada la posición Pos por T turnos
+:-dynamic esperar_desbloq/2.
+
+%--proxima_landmark(-Pos), devuelve la posición Pos de la próxima landmark
 proxima_landmark(Pos):-
-	turno_act(TurnAct),
-	max_num_landmark(MaxNL),
-	N is mod(TurnAct,MaxNL),
-	landmark(Pos,N).
+	prox_landmark(Num),
+	landmark(Pos,Num),
+	
+	retractall(prox_landmark(Num)),
+	max_num_landmark(MNum),
+	Num1 is Num+1,
+	(
+		(
+			Num1<MNum,
+			assert(prox_landmark(Num1))
+		);
+		(
+			((Num1=MNum);(Num1>MNum)),
+			assert(prox_landmark(0))
+		)
+	).
 
 %--pos_aprox_pasable(+Grilla,+Pos,-PosAP), dada la Grilla con el estado interno del terreno del agente y una posición Pos,
 %--determina una posición PosAP. PosAP es Pos si esta última es transitable, en otro caso busca alrededor de Pos
@@ -148,12 +163,16 @@ act_metas_landmarks:-
 	maxFila(Grilla,MF),
 	maxCol(Grilla,MC),
 	
-	cant_divisiones(CantD),
+	cant_divisiones(CantD),write(CantD),nl,
 	
 	CantLandF is ceil(MF/CantD),
-	CantLandC is ceil(MC/CantD),
+	CantLandC is ceil(MC/CantD),write(CantLandC),nl,
 	
 	generar_landmarks(Grilla,0,CantLandF,CantLandC,CantLandF,CantLandC),
+
+	write('Se generó'),nl,
+	%--Inidica la primera landmark a recorrer
+	assert(prox_landmark(0)),
 	
 	forall(
 		landmark(Pos,N),
@@ -199,10 +218,12 @@ act_metas_landmarks:-
 	proxima_landmark(PosLM),
 	write('Mi próxima parada es ...'),write(PosLM),nl,
 	write('Voy a buscar el mejor camino'),nl,
-	%--Y busca un camino a ella, con una profundidad de 1500,
+	%--Y busca un camino a ella,
 	%--aunque para esta altura el agente ya conoce toda la 
 	%--grilla, asi que de existir un camino lo encontrará
-	empezar([PosAct,DirAct],[[PosLM,_DirLM]],SolR,1500),
+	%--a menos que la posición esté demasiado lejos y se corte
+	%--la búsqueda por la cota de profundidad
+	empezar([PosAct,DirAct],[[PosLM,_DirLM]],SolR,250),
 	reverse(SolR,Sol),
 	%--De encontrar uno lo inidica como la próxima meta
 	write('Ya lo encontré, voy a seguirlo supongo...'),
@@ -270,8 +291,8 @@ act_metas_ofensiva:-
 		)
 	),
 	
-	%--Se utiliza una profundidad de 60 para buscar agentes
-	empezar([Pos,Dir],Agentes,SolR,60),
+	%--Se utiliza una profundidad de 120 para buscar agentes
+	empezar([Pos,Dir],Agentes,SolR,120),
 	reverse(SolR,Sol),
 	
 	write('Encontré una forma de alcanzarlo, voy a seguirlo'),nl,
@@ -423,10 +444,10 @@ act_metas_supervivencia:-
 	
 	nl,write('Estos son los que encontre:'),write(Hosteles),nl,
 	
-	%--Se utilza una profundidad de 50 para buscar hosteles, ya que
+	%--Se utilza una profundidad de 100 para buscar hosteles, ya que
 	%--por lo general estarán en zonas accecibles desde el momento
 	%--en que son vistos
-	empezar([PosAg,DirAg],Hosteles,SolR,50),
+	empezar([PosAg,DirAg],Hosteles,SolR,100),
 	reverse(SolR,Sol),
 	
 	write('Siguiendo este nuevo camino:'),write(Sol),nl,
@@ -494,10 +515,10 @@ act_metas_tesoros:-
 	
 	write('Voy a ver si puedo alcanzar alguno...'),nl,
 	
-	%--Busca el menor camino a un tesoro, con una profundidad de 40,
+	%--Busca el menor camino a un tesoro, con una profundidad de 80,
 	%--que de acuerdo a varias pruebas evita que se pierdan turnos
 	%--en los casos que no hay camino posible.
-	empezar([PosAg,DirAg],Tesoros,SolR,40),
+	empezar([PosAg,DirAg],Tesoros,SolR,80),
 	reverse(SolR,Sol),
 	
 	write('Puedo alcanzar uno, voy a actualizar mis metas de riquezas...'),nl,
@@ -514,6 +535,36 @@ act_metas_tesoros:-
 	assert(camino_meta(Sol)).
 
 %--METAS DE EXPLORACION DE TERRENO INEXPLORADO
+
+%--rodea_celda(+Pos,-Dir,-PosAdy), determina las 8 celdas al rededor de Pos
+%--Dir indica la dirección aproximada de la celda PosAdy
+rodea_celda(Pos,Dir,PosAdy):-
+	ady_at_cardinal(Pos,Dir,PosAdy).
+rodea_celda(Pos,Dir,PosAdy):-
+	Pos=[F,C],
+	F1 is F+1,
+	C1 is C+1,
+	PosAdy=[F1,C1],
+	Dir=n.
+rodea_celda(Pos,Dir,PosAdy):-
+	Pos=[F,C],
+	F1 is F+1,
+	C1 is C-1,
+	PosAdy=[F1,C1],
+	Dir=w.
+rodea_celda(Pos,Dir,PosAdy):-
+	Pos=[F,C],
+	F1 is F-1,
+	C1 is C+1,
+	PosAdy=[F1,C1],
+	Dir=e.
+rodea_celda(Pos,Dir,PosAdy):-
+	Pos=[F,C],
+	F1 is F-1,
+	C1 is C-1,
+	PosAdy=[F1,C1],
+	Dir=s.
+
 %--Estas metas buscan mapear todo el terreno a la grilla interna que mantiene el agente,
 %--mediante la percepción del entorno.
 %--En una forma similar a las metas de tesoros y hosteles, busca el camino mas corto
@@ -544,9 +595,10 @@ act_metas_exploracion:-
 			%--que sean transitables...
 			Land\=forest,Land\=water,
 
-			%--y que posean una celda adyacente que no 
+			%--y que posean una celda cercana que no 
 			%--pertenece a la grilla conocida
-			ady_at_cardinal(Pos,Dir,PosAdy),
+			%--ady_at_cardinal(Pos,Dir,PosAdy),
+			rodea_celda(Pos,Dir,PosAdy),
 			CeldaAdy=[PosAdy,_,_],
 			not(member(CeldaAdy,Grilla))
 		),
@@ -561,7 +613,7 @@ act_metas_exploracion:-
 	%--Dado que muchas veces la celda puede estar en el otro extremo
 	%--de la grilla, se le permite una cota de profundadid mas
 	%--grande
-	empezar([PosAg,DirAg],Inexplorados,SolR,1500),
+	empezar([PosAg,DirAg],Inexplorados,SolR,250),
 	reverse(SolR,Sol),
 	
 	write('Si puedo llegar, ya me pongo en marcha, creo...'),nl,
@@ -598,6 +650,35 @@ act_metas_exploracion:-
 %--supone que está en la situación del hostel bloqueado, (u otra razón
 %--no permite atravezar la posición), e intenta buscar un camino por un costado	
 act_metas_bloqueadas:-
+	%--Si existe alguna posición bloqueada
+	no_transitable(Pos),
+	
+	%--Y la cantidad de turnos de espera es 1
+	esperar_desbloq(Pos,Turnos),
+	Turnos=1,
+	
+	%--Entonces se desbloquea la posición
+	retractall(esperar_desbloq(Pos,Turnos)),
+	retractall(no_transitable(Pos)),
+	
+	%--Y falla para determinar si existe una nueva posición bloqueda
+	fail.
+act_metas_bloqueadas:-
+	%--Si existe alguna posición bloqueada
+	no_transitable(Pos),
+	
+	%--Y la cantidad de turnos de espera es mayor que 0
+	esperar_desbloq(Pos,Turnos),
+	Turnos>0,
+	
+	%--Entonces disminuye la cantidad de turnos en uno
+	retractall(esperar_desbloq(Pos,Turnos)),
+	Turnos1 is Turnos-1,
+	assert(esperar_desbloq(Pos,Turnos1)),
+	
+	%--Y falla para determinar si existe una nueva posición bloqueda
+	fail.
+act_metas_bloqueadas:-
 	pos_act(PosAct),
 	dir_act(DirAct),
 	pos_previa(PosPrev),
@@ -618,15 +699,23 @@ act_metas_bloqueadas:-
 	ady_at_cardinal(PosAct,DirAct,PosBloq),
 	assert(no_transitable(PosBloq)),
 	
+	%--Esperará N turnos antes de considerar desbloqueada la posición
+	assert(esperar_desbloq(PosBloq,5)),
+	
+	/*
+	%--Es mejor si no busca el mismo predicado, sino que deja que cada
+	%--predicado particular verifique que se den las condiciones
+	
 	%--Busca un nuevo camino por un costado
 	meta_act(MetaPos),
 	tipo_meta(TMeta),
 	(
 		%--La cota máxima para la busqueda depende del tipo
 		%--de la meta
-		(TMeta=unknown,CotaM=60);
-		(TMeta=landmark,CotaM=1500);
-		(TMeta=treasure,CotaM=40)
+		(TMeta=unknown,CotaM=120);
+		(TMeta=landmark,CotaM=250);
+		(TMeta=treasure,CotaM=80);
+		CotaM=100
 	),
 	
 	empezar([PosAct,DirAct],[[MetaPos,_MetaDir]],SolR,CotaM),
@@ -644,13 +733,17 @@ act_metas_bloqueadas:-
 	reverse(SolR,Sol),
 	
 	write('Si hay forma de pasar, voy a mandarme'),nl,
+	write('Con este camino: '),write(Sol),nl,
 	
 	%--Ya no necesito saber que está bloqueado
-	retract(no_transitable(PosBloq)),
+	%--retract(no_transitable(PosBloq)),
 	
 	%--Actualiza el camino a seguir
 	retractall(camino_meta(_)),
 	assert(camino_meta(Sol)).
+	*/
+	
+	fail.
 
 %--Mas que nada informan por pantalla lo que sucedió
 act_metas_generales:-

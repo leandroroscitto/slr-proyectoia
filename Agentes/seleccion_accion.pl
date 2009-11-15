@@ -215,13 +215,30 @@ sel_accion_supervivencia(Action):-
 			fail
 		)
 	).
-%--sel_accion_supervivencia(+Action), si no esta a full de stamina, se queda esperando en un hostel
+%--sel_accion_supervivencia(+Action), si no esta a full de stamina, se queda esperando en un hostel,
+%--a menos que halla un tesoro, en cuyo caso espera levantarlo en la selección de acciones relacionadas
+%--tesoros
 sel_accion_supervivencia(Action):-
 	sta_act(Sta),
 	msta_act(MSta),
 	(Sta<MSta),
 	
 	pos_act(Pos),
+	
+	objetos_en_pos(Pos,treasure,Tesoros),
+	(
+		%--Si no hay tesoros, continua con el predicado
+		Tesoros=[];
+		(
+			%--En el caso de haber tesoros, falla para permitir
+			%--considerar levantarlo en las selecciones de acciones
+			%--relacionadas con tesoros.
+			%--De todos maneras, al levantar el tesoro recuera
+			%--stamina si está detro de un hostel (es asi?)
+			Tesoros=[],
+			fail
+		)
+	),
 	
 	objetos_en_pos(Pos,hostel,Objetos),
 	
@@ -316,7 +333,7 @@ sel_accion_tesoros(Action):-
 %--a una meta
 sel_accion_metas(Action):-
 	write('Estaba llendo a algún lado?'),nl,
-	seguir_camino(Action), %--VER:SAQUE EL !
+	seguir_camino(Action),
 	write('Si estaba siguiendo el camino'),nl.
 
 %--sel_accion_exploracion(+Action), si no hay camino a seguir, camina al azar
@@ -326,6 +343,6 @@ sel_accion_exploracion(Action):-
 	write('No hay ninguna meta, me pongo a caminar'),nl,
 	caminata_azar(Action).
 %--sel_accion_exploracion(+Action), no hay camino a seguir, no hay celdas inexploradas, y no tiene nada que hacer
-%--Nunca debería ocurrir VER
+%--Nunca debería ocurrir
 sel_accion_exploracion(null_action):-
 	write('No hago nada, nose que pasó'),nl.

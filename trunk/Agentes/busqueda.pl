@@ -1,5 +1,5 @@
 %--IMPLEMENTACION DEL ALGORITMO DE BUSQUEDA A*
-:-consult(extras_for_agents).
+%--Supone que se consulta desde el agente.pl
 
 %--abierto(+Nodo) determina que Nodo se encuentra en la frontera de busqueda
 %--cerrado(+Nodo) determina que Nodo ya fue visitado y expandido
@@ -12,6 +12,7 @@
 %--antes de cortar la busqueda
 :-dynamic cota_prof/1.
 %--Indica que no se cortó la busqueda por superar la máxima profundidad
+%--NO SE UTILIZA
 :-dynamic continuar_busqueda/0.
 
 %--tiempo_inicio(+Momento), Momento indica el tiempo en segundos en el que
@@ -44,9 +45,14 @@ dir_opuesta(s,n).
 dir_opuesta(n,s).
 
 %--Muestra los elementos abiertos (frontera)
-mostrar_abiertos:-write('Abiertos='),forall(abierto([E,_,_,_]),(write(E),write(','))).
+mostrar_abiertosE:-write('Abiertos='),forall(abierto([E,_,_,_]),(write(E),write(','))),nl.
 %--Muestra los elementos cerrados (expandidos)
-mostrar_cerrados:-write('Cerrados='),forall(cerrado([E,_,_,_]),(write(E),write(','))).
+mostrar_cerradosE:-write('Cerrados='),forall(cerrado([E,_,_,_]),(write(E),write(','))),nl.
+
+%--Muestra los elementos abiertos (frontera)
+mostrar_abiertos:-write('Abiertos='),forall(abierto(Nodo),(write(Nodo),write(','))),nl.
+%--Muestra los elementos cerrados (expandidos)
+mostrar_cerrados:-write('Cerrados='),forall(cerrado(Nodo),(write(Nodo),write(','))),nl.
 
 %--Permiten realizar una busqueda desde cero
 resetear_abiertos:-retractall(abierto(_)).
@@ -94,6 +100,7 @@ h(Nodo,Dist):-
 	%--Determina la menor de ellas
 	min_list(LDist,Dist).
 
+/* BACKUPS
 %--adyacente_pos_ini(+PosDir,-PosDirV,-P), dada un par PosDir=[Pos,Dir], determina una posición y dirección
 %--adyacente válida PosDirV=[PosV,DirV] y el costo P necesario para trasladarse a ella
 %--Con válida se refiere que deba ser transitable
@@ -110,6 +117,9 @@ adyacente_pos_ini(PosDir,PosDirV,P):-
 	es_transitable(PosV),
 	
 	PosDirV=[PosV,DirV],
+	
+	estado_grilla(Grilla),
+	member([PosV,Land,_V],Grilla),
 	
 	%--Dos consideraciones para el costo:
 	%--1)Si el terreno es montaña el costo es 2, si es llanura es 1
@@ -143,6 +153,9 @@ adyacente(PosDir,PosDirV,P):-
 	
 	PosDirV=[PosV,DirV],
 	
+	estado_grilla(Grilla),
+	member([PosV,Land,_V],Grilla),
+	
 	%--Dos consideraciones para el costo:
 	%--1)Si el terreno es montaña el costo es 2, si es llanura es 1
 	%--2)Si la dirección en la que está la celda adyacente es
@@ -151,6 +164,50 @@ adyacente(PosDir,PosDirV,P):-
 	((DirV=Dir,P2=0);(DirV\=Dir,P2=1)),
 	
 	%--El costo total es la suma de las dos consideraciones
+	P is P1+P2.
+*/
+
+%--adyacente_pos_ini(+PosDir,-PosDirV,-P), dada un par PosDir=[Pos,Dir], determina los estados
+%--adyacentes al estado inicial
+adyacente_pos_ini(PosDir,PosDirV,P):-
+	%--Determina la posición y dirección actual
+	PosDir=[Pos,Dir],
+	
+	%--Si la posición es transitable
+	es_transitable(Pos),
+	
+	%--Y calcula todas las direcciones posibles a partir de la posición Pos
+	dir_posible(DirV),
+	PosDirV=[Pos,DirV],
+	
+	%--El costo en la situación inicial se determina a partir de si es necesario
+	%--girar para estar en el estado buscado
+	((DirV=Dir,P=0);(DirV\=Dir,P=1)).
+
+%--adyacente(+PosDir,-PosDirV,-P), dada un par PosDir=[Pos,Dir], determina una posición y dirección
+%--adyacente válida PosDirV=[PosV,DirV] y el costo P necesario para trasladarse a ella
+adyacente(PosDir,PosDirV,P):-
+	%--Determina la posición adyacente a la posición y dirección
+	%--actual
+	PosDir=[Pos,Dir],
+	ady_at_cardinal(Pos,Dir,PosV),
+	
+	%--Debe ser transitable
+	es_transitable(PosV),
+	
+	%--Para todas las direcciones posibles determina el para de la posición
+	%--adyacente y una orientación
+	dir_posible(DirV),	
+	PosDirV=[PosV,DirV],
+	
+	%--Calcula el costo de trasladarse a ella a partir del terreno
+	estado_grilla(Grilla),
+	member([PosV,Land,_V],Grilla),
+	
+	((Land=mountain,P1=2);(Land=plain,P1=1)),
+	%--Y si es necesario girar para alcanzar la dirección exacta
+	((DirV=Dir,P2=0);(DirV\=Dir,P2=1)),
+	
 	P is P1+P2.
 
 %--actualizar_ramas_por(+NodoE,+NuevoC,+DifCosto), actualiza el camino NuevoC y el
@@ -230,29 +287,20 @@ generar_vecinos(Nodo):-
 					abierto([NodoV,NodoVH,_,NodoVG]),
 					(GNV<NodoVG),
 					
-					retract(abierto([NodoV,_,_,NodoVG])),
+					retract(abierto([NodoV,NodoVH,_,NodoVG])),
 					assert(abierto([NodoV,NodoVH,[PosE|C],GNV]))
 				);
 				(
 					%--Si el nodo adyacente ya está cerrado,
 					%--pero su costo es mayor al obtenido pasando
 					%--por el nodo de entrada, entonces lo reemplaza
-					%--por la nueva instancia, actualizando primero
-					%--el costo de todos los nodos abiertos o 
-					%--cerrados que pasen por él
+					%--por la nueva instancia y lo vuelve a ingresar
+					%--a la frontera
 					cerrado([NodoV,NodoVH,_,NodoVG]),
 					(GNV<NodoVG),
 					
-					%--Se actualizan todos los costos y caminos de
-					%--los nodos que tengan un camino a través de 
-					%--NodoV
-					
-					%--Diff is (NodoVG-GNV),
-					%--actualizar_ramas_por(NodoV,C,Diff),
-					
-					retract(cerrado([NodoV,_,_,NodoVG])),
+					retract(cerrado([NodoV,NodoVH,_,NodoVG])),
 					assert(abierto([NodoV,NodoVH,[PosE|C],GNV]))
-					%--assert(cerrado([NodoV,NodoVH,[PosE|C],GNV]))
 				);
 				(
 					(
@@ -290,87 +338,117 @@ seleccionarA(Nodo):-
 %--buscarA(-Sol,+Prof), determina el camino solución Sol para la busqueda,
 %--si Prof no supera la cota máxima de profundidad
 buscarA([PosE|SSol],_Prof):-
-%--Este es el caso base, si no se detuvo la busqueda por un corte en la profundidad
+	%--Este es el caso base, si no se detuvo la busqueda por un corte en la profundidad
 	%--continuar_busqueda,
 
-%--Se selecciona un nodo candidato
+	%--Se selecciona un nodo candidato
 	seleccionarA(Nodo),
 	Nodo=[NodoE,_,SSol,_],
 	NodoE=[PosE,DirE],
+	
+	es_transitable(PosE),
 
-%--Y se verifica si es meta
+	%--Y se verifica si es meta
 	esMeta([PosE,DirE]),
-%--En caso de serlo, la solución devuelta se compone de la solución para alcanzar el 
-%--nodo Nodo mas la posición del mismo nodo
+	%--En caso de serlo, la solución devuelta se compone de la solución para alcanzar el 
+	%--nodo Nodo mas la posición del mismo nodo
 
-%--Por control se imprime el tiempo que tomó encontrar la solución
+	%--Por control se imprime el tiempo que tomó encontrar la solución
 	get_time(TiempoAct),
 	tiempo_inicio(TiempoIni),
 	DifT is (TiempoAct-TiempoIni),
+	write('Encontré la solución: '),write(Nodo),nl,
 	write('Tiempo en encontrar la solución: '),write(DifT),nl.
-	
 buscarA(Sol,Prof):-
-%--Si la busqueda no se cortó por la cota máxima
-	%--continuar_busqueda,
+	%--Si la busqueda no se cortó por la cota máxima
+	continuar_busqueda,
 	
-%--Se determina cual esta cota máxima, y se controla
-%--que no se la esté pasando
+	%--Se determina cual esta cota máxima, y se controla
+	%--que no se la esté pasando
 	cota_prof(CotaP),
 	Prof<CotaP,
 
-%--Se selecciona un nodo a expandir y se genera la nueva
-%--frontera
-	seleccionarA(Nodo),
-	generar_vecinos(Nodo),
+	%--mostrar_abiertosE,
+	%--mostrar_cerradosE,
+	
+	%--Se selecciona un nodo a expandir y se genera la nueva
+	%--frontera
+	seleccionarA(Nodo),	
+	
+	%--Evita backtracking
+	continuar_busqueda,
+	(
+		(
+			%--En el caso de que el nodo seleccionada esté en dirección
+			%--a la posición anterior del camino ( su nodo antesesor )
+			%--no genera sus vecionos, ya que estaría considerando
+			%--un camino hacia atrás que no agrega ninguna información
+			%--nueva para la resolución del problema
+			%--Si es considerado para la evaluación de meta en el predicado anterior
+			Nodo=[NodoE,_,Cam,_],
+			NodoE=[PosE,DirE],
+			Cam=[Ant|_SCam],
+			ady_at_cardinal(PosE,DirE,Ant),
+			retractall(abierto(Nodo)),
+			assert(cerrado(Nodo)),
+			fail
+		);
+		(
+			generar_vecinos(Nodo),
+		
+			%--write('Nodo seleccionado: '),write(Nodo),nl,
 
-%--Se busca una solución con el nuevo estado, considerando que
-%--tendrá una profundidad igual a la actual + 1
-	ProfSig is Prof+1,
-	buscarA(Sol,ProfSig).
-
+			%--Se busca una solución con el nuevo estado, considerando que
+			%--tendrá una profundidad igual a la actual + 1
+			ProfSig is Prof+1,
+			buscarA(Sol,ProfSig)
+		)
+	).
 %--Corta la busqueda
 buscarA(Sol,Prof):-
-%--Si la busqueda no se cortó por la cota máxima
-	%--continuar_busqueda,
-%--Obtengo que se superó la cota máxima
+	%--Si la busqueda no se cortó por la cota máxima
+	continuar_busqueda,
+	
+	%--Obtengo que se superó la cota máxima
 	cota_prof(CotaP),
 	(Prof>CotaP;Prof=CotaP),
-
-%--La mejor opcion es devolver un valor nulo, asi evita el backtracking
+	write('Corté la busqueda'),nl,
+	
+	%--La mejor opcion es devolver un valor nulo, asi evita el backtracking
 	Sol=null,
 
-%--Evita que se siga busando una solución
+	%--Evita que se siga busando una solución
 	retractall(continuar_busqueda).
 
 %--empezar(+NodoE,+Metas,-Sol,+CotaP), dado un nodo de inicio NodoE, un conjunto de
 %--metas Metas compuesto por pares [Pos,Dir] y una cota máxima CotaP, intenta buscar
 %--el mejor camino desde NodoE a la meta más cercana
 empezar(NodoE,Metas,Sol,CotaP):-
-%--Deja el estado de la busqueda en 0 para realizar una nueva
+	%--Deja el estado de la busqueda en 0 para realizar una nueva
 	resetear_abiertos,
 	resetear_cerrados,
 	resetear_metas,
 	resetear_cota,
 	
-%--Actualiza el tiempo de inicio de la búsqueda
+	%--Actualiza el tiempo de inicio de la búsqueda
 	get_time(TIni),
 	retractall(tiempo_inicio(_)),
 	assert(tiempo_inicio(TIni)),
 	retractall(continuar_busqueda),
 	assert(continuar_busqueda),
 
-%--Actualiza la cota de profundidad
+	%--Actualiza la cota de profundidad
 	retractall(cota_prof(_)),
 	assert(cota_prof(CotaP)),
 
-%--Indica todas las metas posibles
+	%--Indica todas las metas posibles
 	forall(
 		member(Meta,Metas),		
 		assert(esMeta(Meta))
 	),
 	
-%--Permite utilizar la versión mas eficiente de adyacente, que no genera
-%--caminos para atras, calculando la frontera a partir del nodo inicial
+	%--Permite utilizar la versión mas eficiente de adyacente
+	%--calculando la frontera a partir del nodo inicial
 	(
 		(
 			%--Si es meta el nodo inicial, la solución es un camino vacío
@@ -381,13 +459,12 @@ empezar(NodoE,Metas,Sol,CotaP):-
 			%--Si no es meta el nodo inicial
 			not(esMeta(NodoE)),
 			
-			NodoE=[PosE,_],
 			forall(
 				%--calculando la frontera a partir del nodo inicial
 				adyacente_pos_ini(NodoE,NodoV,P),
 				(
 					h(NodoV,HNV),
-					assert(abierto([NodoV,HNV,[PosE],P]))
+					assert(abierto([NodoV,HNV,[],P]))
 				)
 			),
 			

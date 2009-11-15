@@ -96,8 +96,7 @@ act_estado_objetos(Vis,TurAct):-
 			%--Tiene que considerar si el objeto es un agente,
 			%--ya que en ese caso su descripción puede variar
 			Cosa=[Tipo,Nombre,_],
-			(
-				%--VER: Verificar que el cambio no produjo errores
+			(				
 				(
 					Tipo=agent,
 					member([_,[agent,Nombre,_],_],EIObjetos) 
@@ -148,7 +147,6 @@ act_estado_objetos(Vis,TurAct):-
 	%--En el caso de que existan tesoros percibidos en algún momento que no
 	%--fueron recogidos por el agente o no se comprobó que no se encuentran más
 	%--en el lugar, lo indica
-	%--VER
 	(
 		(
 			member([_,Cosa,_],NObjetos),
